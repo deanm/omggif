@@ -29,9 +29,19 @@ function GifWriter(buf, width, height, gopts) {
 
   var gopts = gopts === undefined ? { } : gopts;
   var loop_count = gopts.loop === undefined ? null : gopts.loop;
+  var global_palette = gopts.palette === undefined ? null : gopts.palette;
 
   if (width <= 0 || height <= 0 || width > 65535 || height > 65535)
     throw "Width/Height invalid."
+
+  function check_palette_and_num_colors(palette) {
+    var num_colors = (palette.length / 3) >> 0;
+    if (num_colors * 3 !== palette.length)
+      throw "Palette must be a multiple of 3 (RGB components).";
+    if (num_colors < 2 || num_colors > 256 ||  num_colors & (num_colors-1))
+      throw "Invalid code/color length, must be power of 2 and 2 .. 256.";
+    return num_colors;
+  }
 
   // TODO(deanm): Accept optional global palette.
 
@@ -39,13 +49,36 @@ function GifWriter(buf, width, height, gopts) {
   buf[p++] = 0x47; buf[p++] = 0x49; buf[p++] = 0x46;  // GIF
   buf[p++] = 0x38; buf[p++] = 0x39; buf[p++] = 0x61;  // 89a
 
+  // Handling of Global Color Table (palette) and background index.
+  var gp_num_colors_pow2 = 0;
+  var background = 0;
+  if (global_palette !== null) {
+    var gp_num_colors = check_palette_and_num_colors(global_palette);
+    while (gp_num_colors >>= 1) ++gp_num_colors_pow2;
+    gp_num_colors = 1 << gp_num_colors_pow2;
+    --gp_num_colors_pow2;
+    if (gopts.background !== undefined) {
+      background = gopts.background;
+      if (background >= gp_num_colors) throw "Background index out of range.";
+    }
+  }
+
   // - Logical Screen Descriptor.
   // NOTE(deanm): w/h apparently ignored by implementations, but set anyway.
   buf[p++] = width & 0xff; buf[p++] = width >> 8 & 0xff;
   buf[p++] = height & 0xff; buf[p++] = height >> 8 & 0xff;
-  buf[p++] = 0;  // Don't use a global color table.
-  buf[p++] = 0;  // No background (no global color table).
-  buf[p++] = 0;  // Pixel aspect ratio (unused).
+  // NOTE: Indicates 0-bpp original color resolution (unused?).
+  buf[p++] = (global_palette !== null ? 0x80 : 0) |  // Global Color Table Flag.
+             gp_num_colors_pow2;  // NOTE: No sort flag (unused?).
+  buf[p++] = background;  // Background Color Index.
+  buf[p++] = 0;  // Pixel aspect ratio (unused?).
+
+  // - Global Color Table
+  if (global_palette !== null) {
+    for (var i = 0, il = global_palette.length; i < il; ++i) {
+      buf[p++] = global_palette[i];
+    }
+  }
 
   if (loop_count !== null) {  // Netscape block for looping.
     if (loop_count < 0 || loop_count > 65535)
@@ -170,8 +203,10 @@ function GifWriter(buf, width, height, gopts) {
 
   var ended = false;
 
-  this.addFrame = function(x, y, w, h, indexed_pixels, palette, opts) {
+  this.addFrame = function(x, y, w, h, indexed_pixels, opts) {
     if (ended === true) { --p; ended = false; }  // Un-end.
+
+    opts = opts === undefined ? { } : opts;
 
     // TODO(deanm): Bounds check x, y.  Do they need to be within the virtual
     // canvas width/height, I imagine?
@@ -181,21 +216,23 @@ function GifWriter(buf, width, height, gopts) {
     if (w <= 0 || h <= 0 || w > 65535 || h > 65535)
       throw "Width/Height invalid."
 
-    if (!palette)
-      throw "Must supply a local palette (for now).";
+    var using_local_palette = true;
+    var palette = opts.palette;
+    if (palette === undefined || palette === null) {
+      using_local_palette = false;
+      palette = global_palette;
+    }
 
-    var num_colors = (palette.length / 3) >> 0;
-    if (num_colors * 3 !== palette.length)
-      throw "Palette must be a multiple of 3 (RGB components).";
-    if (num_colors < 2 || num_colors > 256 ||  num_colors & (num_colors-1))
-      throw "Invalid code/color length, must be power of 2 and 2 .. 256.";
+    if (palette === undefined || palette === null)
+      throw "Must supply either a local or global palette.";
+
+    var num_colors = check_palette_and_num_colors(palette);
 
     // Compute the min_code_size (power of 2), destroying num_colors.
     var min_code_size = 0;
     while (num_colors >>= 1) ++min_code_size;
     num_colors = 1 << min_code_size;  // Now we can easily get it back.
 
-    opts = opts === undefined ? { } : opts;
     var delay = opts.delay === undefined ? 0 : opts.delay;
 
     // - Graphics Control Extension
@@ -215,11 +252,15 @@ function GifWriter(buf, width, height, gopts) {
     buf[p++] = 0; buf[p++] = 0;  // Top.
     buf[p++] = width & 0xff; buf[p++] = width >> 8 & 0xff;
     buf[p++] = height & 0xff; buf[p++] = height >> 8 & 0xff;
-    buf[p++] = 0x80 | (min_code_size-1);  // Local color table and size.
+    // NOTE: No sort flag (unused?).
+    // TODO(deanm): Support interlace.
+    buf[p++] = using_local_palette === true ? (0x80 | (min_code_size-1)) : 0;
 
     // - Local Color Table
-    for (var i = 0, il = palette.length; i < il; ++i) {
-      buf[p++] = palette[i];
+    if (using_local_palette === true) {
+      for (var i = 0, il = palette.length; i < il; ++i) {
+        buf[p++] = palette[i];
+      }
     }
 
     outputLZWCodeStream(min_code_size < 2 ? 2 : min_code_size, indexed_pixels);
