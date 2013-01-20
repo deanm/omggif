@@ -250,8 +250,8 @@ function GifWriter(buf, width, height, gopts) {
     buf[p++] = 0x2c;  // Image Seperator.
     buf[p++] = x & 0xff; buf[p++] = x >> 8 & 0xff;  // Left.
     buf[p++] = y & 0xff; buf[p++] = y >> 8 & 0xff;  // Top.
-    buf[p++] = width & 0xff; buf[p++] = width >> 8 & 0xff;
-    buf[p++] = height & 0xff; buf[p++] = height >> 8 & 0xff;
+    buf[p++] = w & 0xff; buf[p++] = w >> 8 & 0xff;
+    buf[p++] = h & 0xff; buf[p++] = h >> 8 & 0xff;
     // NOTE: No sort flag (unused?).
     // TODO(deanm): Support interlace.
     buf[p++] = using_local_palette === true ? (0x80 | (min_code_size-1)) : 0;
