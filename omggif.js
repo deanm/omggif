@@ -241,15 +241,39 @@ function GifWriter(buf, width, height, gopts) {
 
     var delay = opts.delay === undefined ? 0 : opts.delay;
 
+    // From the spec:
+    //     0 -   No disposal specified. The decoder is
+    //           not required to take any action.
+    //     1 -   Do not dispose. The graphic is to be left
+    //           in place.
+    //     2 -   Restore to background color. The area used by the
+    //           graphic must be restored to the background color.
+    //     3 -   Restore to previous. The decoder is required to
+    //           restore the area overwritten by the graphic with
+    //           what was there prior to rendering the graphic.
+    //  4-7 -    To be defined.
+    // NOTE(deanm): Dispose background doesn't really work, apparently most
+    // browsers ignore the background palette index and clear to transparency.
+    var disposal = opts.disposal === undefined ? 0 : opts.disposal;
+    if (disposal < 0 || disposal > 3)  // 4-7 is reserved.
+      throw "Disposal out of range.";
+
+    var use_transparency = false;
+    var transparent_index = 0;
+    if (opts.transparent !== undefined && opts.transparent !== null) {
+      use_transparency = true;
+      transparent_index = opts.transparent;
+      if (transparent_index < 0 || transparent_index >= num_colors)
+        throw "Transparent color index.";
+    }
+
     // - Graphics Control Extension
     buf[p++] = 0x21; buf[p++] = 0xf9;  // Extension / Label.
     buf[p++] = 4;  // Byte size.
 
-    //buf[p++] = 0x05;  // Disposal 1 + Transparent.
-    //buf[p++] = 0x04;  // Disposal 1.
-    buf[p++] = 0x00;
+    buf[p++] = disposal << 2 | (use_transparency === true ? 1 : 0);
     buf[p++] = delay & 0xff; buf[p++] = delay >> 8 & 0xff;
-    buf[p++] = 0;  // Transparent color index.
+    buf[p++] = transparent_index;  // Transparent color index.
     buf[p++] = 0;  // Block Terminator.
 
     // - Image Descriptor
