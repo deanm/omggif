@@ -24,8 +24,11 @@
 // animation and compression.  It does not rely on any specific underlying
 // system, so should run in the browser, Node, or Plask.
 
-function GifWriter(buf, width, height) {
+function GifWriter(buf, width, height, gopts) {
   var p = 0;
+
+  var gopts = gopts === undefined ? { } : gopts;
+  var loop_count = gopts.loop === undefined ? null : gopts.loop;
 
   if (width <= 0 || height <= 0 || width > 65535 || height > 65535)
     throw "Width/Height invalid."
@@ -43,6 +46,21 @@ function GifWriter(buf, width, height) {
   buf[p++] = 0;  // Don't use a global color table.
   buf[p++] = 0;  // No background (no global color table).
   buf[p++] = 0;  // Pixel aspect ratio (unused).
+
+  if (loop_count !== null) {  // Netscape block for looping.
+    if (loop_count < 0 || loop_count > 65535)
+      throw "Loop count invalid."
+    // Extension code, label, and length.
+    buf[p++] = 0x21; buf[p++] = 0xff; buf[p++] = 0x0b;
+    // NETSCAPE2.0
+    buf[p++] = 0x4e; buf[p++] = 0x45; buf[p++] = 0x54; buf[p++] = 0x53;
+    buf[p++] = 0x43; buf[p++] = 0x41; buf[p++] = 0x50; buf[p++] = 0x45;
+    buf[p++] = 0x32; buf[p++] = 0x2e; buf[p++] = 0x30;
+    // Sub-block
+    buf[p++] = 0x03; buf[p++] = 0x01;
+    buf[p++] = loop_count & 0xff; buf[p++] = loop_count >> 8 & 0xff;
+    buf[p++] = 0x00;  // Terminator.
+  }
 
   // Main compression routine, palette indexes -> LZW code stream.
   function outputLZWCodeStream(min_code_size, index_stream) {
@@ -152,7 +170,7 @@ function GifWriter(buf, width, height) {
 
   var ended = false;
 
-  this.addFrame = function(x, y, w, h, indexed_pixels, palette) {
+  this.addFrame = function(x, y, w, h, indexed_pixels, palette, opts) {
     if (ended === true) { --p; ended = false; }  // Un-end.
 
     // TODO(deanm): Bounds check x, y.  Do they need to be within the virtual
@@ -177,6 +195,9 @@ function GifWriter(buf, width, height) {
     while (num_colors >>= 1) ++min_code_size;
     num_colors = 1 << min_code_size;  // Now we can easily get it back.
 
+    opts = opts === undefined ? { } : opts;
+    var delay = opts.delay === undefined ? 0 : opts.delay;
+
     // - Graphics Control Extension
     buf[p++] = 0x21; buf[p++] = 0xf9;  // Extension / Label.
     buf[p++] = 4;  // Byte size.
@@ -184,7 +205,7 @@ function GifWriter(buf, width, height) {
     //buf[p++] = 0x05;  // Disposal 1 + Transparent.
     //buf[p++] = 0x04;  // Disposal 1.
     buf[p++] = 0x00;
-    buf[p++] = 0; buf[p++] = 0;  // Delay time.
+    buf[p++] = delay & 0xff; buf[p++] = delay >> 8 & 0xff;
     buf[p++] = 0;  // Transparent color index.
     buf[p++] = 0;  // Block Terminator.
 
