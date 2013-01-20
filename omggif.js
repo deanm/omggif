@@ -248,8 +248,8 @@ function GifWriter(buf, width, height, gopts) {
 
     // - Image Descriptor
     buf[p++] = 0x2c;  // Image Seperator.
-    buf[p++] = 0; buf[p++] = 0;  // Left.
-    buf[p++] = 0; buf[p++] = 0;  // Top.
+    buf[p++] = x & 0xff; buf[p++] = x >> 8 & 0xff;  // Left.
+    buf[p++] = y & 0xff; buf[p++] = y >> 8 & 0xff;  // Top.
     buf[p++] = width & 0xff; buf[p++] = width >> 8 & 0xff;
     buf[p++] = height & 0xff; buf[p++] = height >> 8 & 0xff;
     // NOTE: No sort flag (unused?).
