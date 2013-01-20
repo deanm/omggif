@@ -60,6 +60,12 @@ function GifWriter(buf, width, height, gopts) {
     if (gopts.background !== undefined) {
       background = gopts.background;
       if (background >= gp_num_colors) throw "Background index out of range.";
+      // The GIF spec states that a background index of 0 should be ignored, so
+      // this is probably a mistake and you really want to set it to another
+      // slot in the palette.  But actually in the end most browsers, etc end
+      // up ignoring this almost completely (including for dispose background).
+      if (background === 0)
+        throw "Background index explicitly passed as 0.";
     }
   }
 
