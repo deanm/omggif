@@ -267,14 +267,16 @@ function GifWriter(buf, width, height, gopts) {
         throw "Transparent color index.";
     }
 
-    // - Graphics Control Extension
-    buf[p++] = 0x21; buf[p++] = 0xf9;  // Extension / Label.
-    buf[p++] = 4;  // Byte size.
+    if (disposal !== 0 || use_transparency || delay !== 0) {
+      // - Graphics Control Extension
+      buf[p++] = 0x21; buf[p++] = 0xf9;  // Extension / Label.
+      buf[p++] = 4;  // Byte size.
 
-    buf[p++] = disposal << 2 | (use_transparency === true ? 1 : 0);
-    buf[p++] = delay & 0xff; buf[p++] = delay >> 8 & 0xff;
-    buf[p++] = transparent_index;  // Transparent color index.
-    buf[p++] = 0;  // Block Terminator.
+      buf[p++] = disposal << 2 | (use_transparency === true ? 1 : 0);
+      buf[p++] = delay & 0xff; buf[p++] = delay >> 8 & 0xff;
+      buf[p++] = transparent_index;  // Transparent color index.
+      buf[p++] = 0;  // Block Terminator.
+    }
 
     // - Image Descriptor
     buf[p++] = 0x2c;  // Image Seperator.
