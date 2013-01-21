@@ -119,7 +119,7 @@ function GifWriter(buf, width, height, gopts) {
     // bits here (and then we would write out).
     var cur = 0;
 
-    function emit_bits_to_buffer(bit_block_size) {
+    function emit_bytes_to_buffer(bit_block_size) {
       while (cur_shift >= bit_block_size) {
         buf[p++] = cur & 0xff;
         cur >>= 8;
@@ -135,12 +135,8 @@ function GifWriter(buf, width, height, gopts) {
     function emit_code(c) {
       cur |= c << cur_shift;
       cur_shift += cur_code_size;
-      emit_bits_to_buffer(8);
+      emit_bytes_to_buffer(8);
     }
-
-    // TODO(deanm): Very badly implemented code table...
-    var code_table = { };
-    var index_buffer = null;
 
     // The algorithm is defined in terms of having an "index buffer", which
     // holds the input codes that are waiting to be emitted.  However, when
@@ -153,6 +149,9 @@ function GifWriter(buf, width, height, gopts) {
     var ib_code = index_stream[0] & code_mask;
     // Code for tracking current dictionary key (like ",1,2,3,3").
     var cur_key = ',' + ib_code;
+    // NOTE: Using an object as a dictionary has a few caveats, but our keys
+    // will always have a ',' and we should be okay.
+    var code_table = { };
 
     // First index of stream already loaded into index buffer, process the rest.
     for (var i = 1, il = index_stream.length; i < il; ++i) {
@@ -192,7 +191,7 @@ function GifWriter(buf, width, height, gopts) {
     emit_code(eoi_code);
 
     // Flush / finalize the sub-blocks stream.
-    emit_bits_to_buffer(1);
+    emit_bytes_to_buffer(1);
 
     if (p + 1 === cur_subblock) {
       // Can just use the current empty sub-block as the terminator.
