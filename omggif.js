@@ -41,8 +41,6 @@ function GifWriter(buf, width, height, gopts) {
     return num_colors;
   }
 
-  // TODO(deanm): Accept optional global palette.
-
   // - Header.
   buf[p++] = 0x47; buf[p++] = 0x49; buf[p++] = 0x46;  // GIF
   buf[p++] = 0x38; buf[p++] = 0x39; buf[p++] = 0x61;  // 89a
