@@ -227,10 +227,8 @@ function GifWriterOutputLZWCodeStream(buf, p, min_code_size, index_stream) {
   function emit_bytes_to_buffer(bit_block_size) {
     while (cur_shift >= bit_block_size) {
       buf[p++] = cur & 0xff;
-      cur >>= 8;
-      cur_shift -= 8;
-      // If we've finished a subblock.
-      if (p - cur_subblock === 256) {
+      cur >>= 8; cur_shift -= 8;
+      if (p === cur_subblock + 256) {  // Finished a subblock.
         buf[cur_subblock] = 255;
         cur_subblock = p++;
       }
@@ -292,9 +290,24 @@ function GifWriterOutputLZWCodeStream(buf, p, min_code_size, index_stream) {
 
     // Check if we have to create a new code table entry.
     if (cur_code === undefined) {  // We don't have buffer + k.
-
       // Emit index buffer (without k).
-      emit_code(ib_code);
+      // This is an inline version of emit_code, because this is the core
+      // writing routine of the compressor (and V8 cannot inline emit_code
+      // because it is a closure here in a different context).  Additionally
+      // we can call emit_byte_to_buffer less often, because we can have
+      // 30-bits (from our 31-bit signed SMI), and we know our codes will only
+      // be 12-bits, so can safely have 18-bits there without overflow.
+      // emit_code(ib_code);
+      cur |= ib_code << cur_shift;
+      cur_shift += cur_code_size;
+      while (cur_shift >= 8) {
+        buf[p++] = cur & 0xff;
+        cur >>= 8; cur_shift -= 8;
+        if (p === cur_subblock + 256) {  // Finished a subblock.
+          buf[cur_subblock] = 255;
+          cur_subblock = p++;
+        }
+      }
 
       if (next_code === 4096) {  // Table full, need a clear.
         emit_code(clear_code);
