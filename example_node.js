@@ -50,7 +50,42 @@ function gen_gray_strip() {
   return buf.slice(0, gf.end());
 }
 
+function gen_color_strip() {
+  var gf = new omggif.GifWriter(buf, 256, 256, {palette: [0, 0, 0, 255, 0, 0],
+                                               background: 1});
+
+  var indices = [ ];
+  for (var i = 0; i < 256; ++i) indices.push(i);
+
+  for (var j = 0; j < 256; ++j) {
+    var palette = [ ];
+    for (var i = 0; i < 256; ++i) {
+      palette.push(j); palette.push(i); palette.push(i);
+    }
+    gf.addFrame(0, j, 256, 1, indices, {palette: palette, disposal: 1});
+  }
+  return buf.slice(0, gf.end());
+}
+
+// 1x1 white, generates the same as Google's 35 byte __utm.gif, except for some
+// reason that I'm not sure of they set their background index to 255.
+function gen_empty_white() {
+  var gf = new omggif.GifWriter(buf, 1, 1, {palette: [255, 255, 255, 0, 0, 0]});
+  gf.addFrame(0, 0, 1, 1, [0]);
+  return buf.slice(0, gf.end());
+}
+
+// 1x1 transparent 43 bytes.
+function gen_empty_trans() {
+  var gf = new omggif.GifWriter(buf, 1, 1, {palette: [0, 0, 0, 0, 0, 0]});
+  gf.addFrame(0, 0, 1, 1, [0], {transparent: 0});
+  return buf.slice(0, gf.end());
+}
+
 fs.writeFileSync('./test_static_global_palette.gif', gen_static_global());
 fs.writeFileSync('./test_static_local_palette.gif', gen_static_local());
 fs.writeFileSync('./test_anim.gif', gen_anim());
 fs.writeFileSync('./test_gray_strip.gif', gen_gray_strip());
+fs.writeFileSync('./test_color_strip.gif', gen_color_strip());
+fs.writeFileSync('./test_empty_white.gif', gen_empty_white());
+fs.writeFileSync('./test_empty_trans.gif', gen_empty_trans());
