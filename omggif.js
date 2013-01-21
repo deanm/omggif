@@ -270,7 +270,7 @@ function GifWriterOutputLZWCodeStream(buf, p, min_code_size, index_stream) {
   // to exist by the nature of the algorithm) and the next character D.
   // Therefor the tuple of (table_entry, byte) is guaranteed to also be
   // unique.  This allows us to create a simple lookup key for mapping input
-  // sequences to codes (table indicies) without having to store or search
+  // sequences to codes (table indices) without having to store or search
   // any of the code sequences.  So if 'AAAA' has a table entry of 12, the
   // tuple of ('AAAA', K) for any input byte K will be unique, and can be our
   // key.  This leads to a integer value at most 20-bits, which can always
