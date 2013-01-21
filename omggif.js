@@ -140,7 +140,14 @@ function GifWriter(buf, width, height, gopts) {
     var code_table = { };
     var index_buffer = null;
 
-    emit_code(clear_code);
+    // The algorithm is defined in terms of having an "index buffer", which
+    // holds the input codes that are waiting to be emitted.  However, when
+    // they are emitted they will be a single output code, so instead of
+    // keeping a buffer you can just track the code.  Additionally our
+    // dictionary keys are always growing (appending) so we can continually
+    // build the keys as we go instead of rebuilding them each time.
+    var cur_key = '';
+    var ib_code = 0;  // Code representing contents of the "index buffer".
 
     for (var i = 0, il = index_stream.length; i < il; ++i) {
       var k = index_stream[i];
@@ -148,51 +155,43 @@ function GifWriter(buf, width, height, gopts) {
       if (k >= clear_code)
         throw "Index stream contains index outside of palette range.";
 
+      cur_key += ',' + k;
+
       // First index of stream, just load into the index buffer.
       if (i === 0) {
-        index_buffer = [ k ];
+        ib_code = k;
         continue;
       }
 
-      // Otherwise check if we have to create a new code table entry.
-      index_buffer.push(k);  // buffer + k.
-      var key = index_buffer.join(',');
-      if (!(key in code_table)) {  // Do we not have buffer + k?
+      // Check if we have to create a new code table entry.
+      var cur_code = code_table[cur_key];  // buffer + k.
+      if (cur_code === undefined) {  // We don't have buffer + k.
         // NOTE(deanm): It's a bit tricky to understand exactly when to move
         // to the next bit size.  Looks like the right approach is to first
         // first emit any pending codes, then increase.
 
-        index_buffer.pop(k);
-        // Emit buffer (without k).
-        if (index_buffer.length === 1) {
-          emit_code(index_buffer[0]);
-        } else {
-          emit_code(code_table[index_buffer.join(',')]);
-        }
+        // Emit index buffer (without k).
+        emit_code(ib_code);
 
         if (next_code === 4096) {  // Table full, need a clear.
           emit_code(clear_code);
           next_code = eoi_code + 1;
           cur_code_size = min_code_size + 1;
           code_table = { };
-        } else {
+        } else {  // Table not full, insert a new entry.
           if (next_code >= (1 << cur_code_size)) ++cur_code_size;
-          code_table[key] = next_code++;  // Insert code
+          code_table[cur_key] = next_code++;  // Insert code
         }
+
         // index_buffer then becomes k.
-        index_buffer = [ k ];
+        cur_key = ',' + k;
+        cur_code = k;  // To set ib_code.
       }
+
+      ib_code = cur_code;
     }
 
-    if (index_buffer.length === 0)
-      throw "Finished with an empty index buffer, something is wrong.";
-
-    if (index_buffer.length === 1) {
-      emit_code(index_buffer[0]);
-    } else {
-      emit_code(code_table[index_buffer.join(',')]);
-    }
-
+    emit_code(ib_code);
     emit_code(eoi_code);
 
     // Flush / finalize the sub-blocks stream.
