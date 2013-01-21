@@ -138,33 +138,55 @@ function GifWriter(buf, width, height, gopts) {
       emit_bytes_to_buffer(8);
     }
 
-    // The algorithm is defined in terms of having an "index buffer", which
-    // holds the input codes that are waiting to be emitted.  However, when
-    // they are emitted they will be a single output code, so instead of
-    // keeping a buffer you can just track the code.  Additionally our
-    // dictionary keys are always growing (appending) so we can continually
-    // build the keys as we go instead of rebuilding them each time.
+    // I am not an expert on the topic, and I don't want to write a thesis.
+    // However, it is good to outline here the basic algorithm and the few data
+    // structures and optimizations here that make this implementation fast.
+    // The basic idea behind LZW is to build a table of previously seen runs
+    // addressed by a short id (herein called output code).  All data is
+    // referenced by a code, which represents one or more values from the
+    // original input stream.  All input bytes can be referenced as the same
+    // value as an output code.  So if you didn't want any compression, you
+    // could more or less just output the original bytes as codes (there are
+    // some details to this, but it is the idea).  In order to achieve
+    // compression, values greater then the input range (codes can be up to
+    // 12-bit while input only 8-bit) represent a sequence of previously seen
+    // inputs.  The decompressor is able to build the same mapping while
+    // decoding, so there is always a shared common knowledge between the
+    // encoding and decoder, which is also important for "timing" aspects like
+    // how to handle variable bit width code encoding.
+    //
+    // One obvious but very important consequence of the table system is there
+    // is always a unique id (at most 12-bits) to map the runs.  'A' might be
+    // 4, then 'AA' might be 10, 'AAA' 11, 'AAAA' 12, etc.  This relationship
+    // can be used for an effecient lookup strategy for the code mapping.  We
+    // need to know if a run has been seen before, and be able to map that run
+    // to the output code.  Since we start with known unique ids (input bytes),
+    // and then from those build more unique ids (table entries), we can
+    // continue this chain (almost like a linked list) to always have small
+    // integer values that represent the current byte chains in the encoder.
+    // This means instead of tracking the input bytes (AAAABCD) to know our
+    // current state, we can track the table entry for AAAABC (it is guaranteed
+    // to exist by the nature of the algorithm) and the next character D.
+    // Therefor the tuple of (table_entry, byte) is guaranteed to also be
+    // unique.  This allows us to create a simple lookup key for mapping input
+    // sequences to codes (table indicies) without having to store or search
+    // any of the code sequences.  So if 'AAAA' has a table entry of 12, the
+    // tuple of ('AAAA', K) for any input byte K will be unique, and can be our
+    // key.  This leads to a integer value at most 20-bits, which can always
+    // fit in an SMI value and be used as a fast sparse array / object key.
 
-    // Code for contents of the index buffer.
-    var ib_code = index_stream[0] & code_mask;
-    // Code for tracking current dictionary key (like ",1,2,3,3").
-    var cur_key = ',' + ib_code;
-    // NOTE: Using an object as a dictionary has a few caveats, but our keys
-    // will always have a ',' and we should be okay.
-    var code_table = { };
+    // Output code for the current contents of the index buffer.
+    var ib_code = index_stream[0] & code_mask;  // Load first input index.
+    var code_table = { };  // Key'd on our 20-bit "tuple".
 
-    // First index of stream already loaded into index buffer, process the rest.
+    // First index already loaded, process the rest of the stream.
     for (var i = 1, il = index_stream.length; i < il; ++i) {
       var k = index_stream[i] & code_mask;
-      cur_key += ',' + k;  // Build on to the dictionary key.
-
+      var cur_key = ib_code << 8 | k;  // (prev, k) unique tuple.
       var cur_code = code_table[cur_key];  // buffer + k.
 
       // Check if we have to create a new code table entry.
       if (cur_code === undefined) {  // We don't have buffer + k.
-        // NOTE(deanm): It's a bit tricky to understand exactly when to move
-        // to the next bit size.  Looks like the right approach is to first
-        // first emit any pending codes, then increase.
 
         // Emit index buffer (without k).
         emit_code(ib_code);
@@ -175,29 +197,33 @@ function GifWriter(buf, width, height, gopts) {
           cur_code_size = min_code_size + 1;
           code_table = { };
         } else {  // Table not full, insert a new entry.
+          // Increase our variable bit code sizes if necessary.  This is a bit
+          // tricky as it is based on "timing" between the encoding and
+          // decoder.  From the encoders perspective this should happen after
+          // we've already emitted the index buffer and are about to create the
+          // first table entry that would overflow our current code bit size.
           if (next_code >= (1 << cur_code_size)) ++cur_code_size;
-          code_table[cur_key] = next_code++;  // Insert code
+          code_table[cur_key] = next_code++;  // Insert into code table.
         }
 
-        // Index buffer then becomes just k.
-        cur_key = ',' + k;
-        ib_code = k;
+        ib_code = k;  // Index buffer to single input k.
       } else {
-        ib_code = cur_code;
+        ib_code = cur_code;  // Index buffer to sequence in code table.
       }
     }
 
-    emit_code(ib_code);
-    emit_code(eoi_code);
+    emit_code(ib_code);  // There will still be something in the index buffer.
+    emit_code(eoi_code);  // End Of Information.
 
-    // Flush / finalize the sub-blocks stream.
+    // Flush / finalize the sub-blocks stream to the buffer.
     emit_bytes_to_buffer(1);
 
-    if (p + 1 === cur_subblock) {
-      // Can just use the current empty sub-block as the terminator.
+    // Finish the sub-blocks, writing out any unfinished lengths and
+    // terminating with a sub-block of length 0.  If we have already started
+    // but not yet used a sub-block it can just become the terminator.
+    if (p + 1 === cur_subblock) {  // Started but unused.
       buf[cur_subblock] = 0;
-    } else {
-      // Finish the current sub-block and terminate.
+    } else {  // Started and used, write length and additional terminator block.
       buf[cur_subblock] = p - cur_subblock - 1;
       buf[p++] = 0;
     }
