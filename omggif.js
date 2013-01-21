@@ -116,6 +116,9 @@ function GifWriter(buf, width, height, gopts) {
     if (w <= 0 || h <= 0 || w > 65535 || h > 65535)
       throw "Width/Height invalid."
 
+    if (indexed_pixels.length < w * h)
+      throw "Not enough pixels for the frame size.";
+
     var using_local_palette = true;
     var palette = opts.palette;
     if (palette === undefined || palette === null) {
