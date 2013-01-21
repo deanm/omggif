@@ -9,7 +9,7 @@ var omggif = require('./omggif');
 var buf = new Buffer(1024 * 1024);
 
 function gen_static_global() {
-  var gf = new omggif.GifWriter(buf, 2, 2, {palette: [255, 0, 0, 0, 0, 255]});
+  var gf = new omggif.GifWriter(buf, 2, 2, {palette: [0xff0000, 0x0000ff]});
   gf.addFrame(0, 0, 2, 2,
               [0, 1, 1, 0]);
   return buf.slice(0, gf.end());
@@ -19,7 +19,7 @@ function gen_static_local() {
   var gf = new omggif.GifWriter(buf, 2, 2);
   gf.addFrame(0, 0, 2, 2,
               [0, 1, 1, 0],
-              {palette: [255, 0, 0, 0, 0, 255]});
+              {palette: [0xff0000, 0x0000ff]});
   return buf.slice(0, gf.end());
 }
 
@@ -30,10 +30,10 @@ function gen_anim() {
   var gf = new omggif.GifWriter(buf, 2, 2, {loop: 1});
   gf.addFrame(0, 0, 2, 2,
               [0, 1, 1, 0],
-              {palette: [255, 0, 0, 0, 0, 255]});
+              {palette: [0xff0000, 0x0000ff]});
   gf.addFrame(0, 0, 2, 2,
               [1, 0, 0, 1],
-              {palette: [255, 0, 0, 0, 0, 255],
+              {palette: [0xff0000, 0x0000ff],
                delay: 10});  // Delay in hundredths of a sec (100 = 1s).
   return buf.slice(0, gf.end());
 }
@@ -43,15 +43,18 @@ function gen_gray_strip() {
   var palette = [ ];
   var indices = [ ];
   for (var i = 0; i < 256; ++i) {
-    palette.push(i); palette.push(i); palette.push(i);
+    palette.push(i << 16 | i << 8 | i);
     indices.push(i);
   }
   gf.addFrame(0, 0, 256, 1, indices, {palette: palette});
   return buf.slice(0, gf.end());
 }
 
+// More than 8-bit color (via tiling of several frames).  Browsers seem to
+// treat this as an animation though, with an enforced minimum time between
+// frames which makes it animated instead of the intended static image.
 function gen_color_strip() {
-  var gf = new omggif.GifWriter(buf, 256, 256, {palette: [0, 0, 0, 255, 0, 0],
+  var gf = new omggif.GifWriter(buf, 256, 256, {palette: [0x000000, 0xff0000],
                                                background: 1});
 
   var indices = [ ];
@@ -59,9 +62,8 @@ function gen_color_strip() {
 
   for (var j = 0; j < 256; ++j) {
     var palette = [ ];
-    for (var i = 0; i < 256; ++i) {
-      palette.push(j); palette.push(i); palette.push(i);
-    }
+    for (var i = 0; i < 256; ++i)
+      palette.push(j << 16 | i << 8 | i);
     gf.addFrame(0, j, 256, 1, indices, {palette: palette, disposal: 1});
   }
   return buf.slice(0, gf.end());
@@ -70,14 +72,14 @@ function gen_color_strip() {
 // 1x1 white, generates the same as Google's 35 byte __utm.gif, except for some
 // reason that I'm not sure of they set their background index to 255.
 function gen_empty_white() {
-  var gf = new omggif.GifWriter(buf, 1, 1, {palette: [255, 255, 255, 0, 0, 0]});
+  var gf = new omggif.GifWriter(buf, 1, 1, {palette: [0xffffff, 0x000000]});
   gf.addFrame(0, 0, 1, 1, [0]);
   return buf.slice(0, gf.end());
 }
 
 // 1x1 transparent 43 bytes.
 function gen_empty_trans() {
-  var gf = new omggif.GifWriter(buf, 1, 1, {palette: [0, 0, 0, 0, 0, 0]});
+  var gf = new omggif.GifWriter(buf, 1, 1, {palette: [0x000000, 0x000000]});
   gf.addFrame(0, 0, 1, 1, [0], {transparent: 0});
   return buf.slice(0, gf.end());
 }

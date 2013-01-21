@@ -35,9 +35,7 @@ function GifWriter(buf, width, height, gopts) {
     throw "Width/Height invalid."
 
   function check_palette_and_num_colors(palette) {
-    var num_colors = (palette.length / 3) >> 0;
-    if (num_colors * 3 !== palette.length)
-      throw "Palette must be a multiple of 3 (RGB components).";
+    var num_colors = palette.length;
     if (num_colors < 2 || num_colors > 256 ||  num_colors & (num_colors-1))
       throw "Invalid code/color length, must be power of 2 and 2 .. 256.";
     return num_colors;
@@ -82,7 +80,10 @@ function GifWriter(buf, width, height, gopts) {
   // - Global Color Table
   if (global_palette !== null) {
     for (var i = 0, il = global_palette.length; i < il; ++i) {
-      buf[p++] = global_palette[i];
+      var rgb = global_palette[i];
+      buf[p++] = rgb >> 16 & 0xff;
+      buf[p++] = rgb >> 8 & 0xff;
+      buf[p++] = rgb & 0xff;
     }
   }
 
@@ -291,7 +292,10 @@ function GifWriter(buf, width, height, gopts) {
     // - Local Color Table
     if (using_local_palette === true) {
       for (var i = 0, il = palette.length; i < il; ++i) {
-        buf[p++] = palette[i];
+        var rgb = palette[i];
+        buf[p++] = rgb >> 16 & 0xff;
+        buf[p++] = rgb >> 8 & 0xff;
+        buf[p++] = rgb & 0xff;
       }
     }
 
