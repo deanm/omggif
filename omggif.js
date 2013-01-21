@@ -103,11 +103,13 @@ function GifWriter(buf, width, height, gopts) {
   }
 
   // Main compression routine, palette indexes -> LZW code stream.
+  // |index_stream| must have at least one entry.
   function outputLZWCodeStream(min_code_size, index_stream) {
     buf[p++] = min_code_size;
     var cur_subblock = p++;  // Pointing at the length field.
 
     var clear_code = 1 << min_code_size;
+    var code_mask = clear_code - 1;
     var eoi_code = clear_code + 1;
     var next_code = eoi_code + 1;
 
@@ -146,25 +148,20 @@ function GifWriter(buf, width, height, gopts) {
     // keeping a buffer you can just track the code.  Additionally our
     // dictionary keys are always growing (appending) so we can continually
     // build the keys as we go instead of rebuilding them each time.
-    var cur_key = '';
-    var ib_code = 0;  // Code representing contents of the "index buffer".
 
-    for (var i = 0, il = index_stream.length; i < il; ++i) {
-      var k = index_stream[i];
+    // Code for contents of the index buffer.
+    var ib_code = index_stream[0] & code_mask;
+    // Code for tracking current dictionary key (like ",1,2,3,3").
+    var cur_key = ',' + ib_code;
 
-      if (k >= clear_code)
-        throw "Index stream contains index outside of palette range.";
+    // First index of stream already loaded into index buffer, process the rest.
+    for (var i = 1, il = index_stream.length; i < il; ++i) {
+      var k = index_stream[i] & code_mask;
+      cur_key += ',' + k;  // Build on to the dictionary key.
 
-      cur_key += ',' + k;
-
-      // First index of stream, just load into the index buffer.
-      if (i === 0) {
-        ib_code = k;
-        continue;
-      }
+      var cur_code = code_table[cur_key];  // buffer + k.
 
       // Check if we have to create a new code table entry.
-      var cur_code = code_table[cur_key];  // buffer + k.
       if (cur_code === undefined) {  // We don't have buffer + k.
         // NOTE(deanm): It's a bit tricky to understand exactly when to move
         // to the next bit size.  Looks like the right approach is to first
@@ -183,12 +180,12 @@ function GifWriter(buf, width, height, gopts) {
           code_table[cur_key] = next_code++;  // Insert code
         }
 
-        // index_buffer then becomes k.
+        // Index buffer then becomes just k.
         cur_key = ',' + k;
-        cur_code = k;  // To set ib_code.
+        ib_code = k;
+      } else {
+        ib_code = cur_code;
       }
-
-      ib_code = cur_code;
     }
 
     emit_code(ib_code);
