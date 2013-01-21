@@ -170,9 +170,9 @@ function GifWriter(buf, width, height, gopts) {
         }
 
         if (next_code === 4096) {  // Table full, need a clear.
+          emit_code(clear_code);
           next_code = eoi_code + 1;
           cur_code_size = min_code_size + 1;
-          emit_code(clear_code);
           code_table = { };
         } else {
           if (next_code >= (1 << cur_code_size)) ++cur_code_size;
