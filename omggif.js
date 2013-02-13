@@ -391,19 +391,27 @@ function GifReader(buf) {
     switch (buf[p++]) {
       case 0x21:  // Graphics Control Extension Block
         switch (buf[p++]) {
-          case 0xff:  // Netscape / loop block.
-            if (buf[p++] !== 0x0b ||  // 21 FF already read, check block size.
+          case 0xff:  // Application specific block
+            // Try if it's a Netscape block (with animation loop counter).
+            if (buf[p   ] !== 0x0b ||  // 21 FF already read, check block size.
                 // NETSCAPE2.0
-                buf[p++] !== 0x4e || buf[p++] !== 0x45 || buf[p++] !== 0x54 ||
-                buf[p++] !== 0x53 || buf[p++] !== 0x43 || buf[p++] !== 0x41 ||
-                buf[p++] !== 0x50 || buf[p++] !== 0x45 || buf[p++] !== 0x32 ||
-                buf[p++] !== 0x2e || buf[p++] !== 0x30 ||
+                buf[p+1 ] == 0x4e && buf[p+2 ] == 0x45 && buf[p+3 ] == 0x54 &&
+                buf[p+4 ] == 0x53 && buf[p+5 ] == 0x43 && buf[p+6 ] == 0x41 &&
+                buf[p+7 ] == 0x50 && buf[p+8 ] == 0x45 && buf[p+9 ] == 0x32 &&
+                buf[p+10] == 0x2e && buf[p+11] == 0x30 &&
                 // Sub-block
-                buf[p++] !== 0x03 || buf[p++] !== 0x01 || buf[p+2] !== 0) {
-              throw "Invalid Netscape extension block.";
+                buf[p+12] == 0x03 && buf[p+13] == 0x01 && buf[p+16] == 0) {
+              p += 14;
+              loop_count = buf[p++] | buf[p++] << 8;
+              p++;  // Skip terminator.
+            } else {  // We don't know what it is, just try to get past it.
+              p += 12;
+              while (true) {  // Seek through subblocks.
+                var block_size = buf[p++];
+                if (block_size === 0) break;
+                p += block_size;
+              }
             }
-            loop_count = buf[p++] | buf[p++] << 8;
-            p++;  // Skip terminator.
             break;
 
           case 0xf9:  // Graphics Control Extension
