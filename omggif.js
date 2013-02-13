@@ -416,6 +416,15 @@ function GifReader(buf) {
             p++;  // Skip terminator.
             break;
 
+          case 0xfe:  // Comment Extension.
+            while (true) {  // Seek through subblocks.
+              var block_size = buf[p++];
+              if (block_size === 0) break;
+              // console.log(buf.slice(p, p+block_size).toString('ascii'));
+              p += block_size;
+            }
+            break;
+
           default:
             throw "Unknown graphic control label: 0x" + buf[p-1].toString(16);
         }
