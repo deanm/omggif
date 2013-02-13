@@ -624,18 +624,17 @@ function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
       chase >>= 8;
     }
 
-    if (prev_code !== null) {
+    if (prev_code !== null && next_code < 4096) {
       code_table[next_code++] = prev_code << 8 | k;
-    }
-
-    // TODO(deanm): Figure out this clearing vs code growth logic better.  I
-    // have an feeling that it should just happen somewhere else, for now it
-    // is awkward between when we grow past the max and then hit a clear code.
-    // For now just check if we hit the max 12-bits (then a clear code should
-    // follow, also of course encoded in 12-bits).
-    if (next_code >= code_mask+1 && cur_code_size < 12) {
-      ++cur_code_size;
-      code_mask = code_mask << 1 | 1;
+      // TODO(deanm): Figure out this clearing vs code growth logic better.  I
+      // have an feeling that it should just happen somewhere else, for now it
+      // is awkward between when we grow past the max and then hit a clear code.
+      // For now just check if we hit the max 12-bits (then a clear code should
+      // follow, also of course encoded in 12-bits).
+      if (next_code >= code_mask+1 && cur_code_size < 12) {
+        ++cur_code_size;
+        code_mask = code_mask << 1 | 1;
+      }
     }
 
     prev_code = code;
