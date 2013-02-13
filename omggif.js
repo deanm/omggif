@@ -538,19 +538,6 @@ function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
   
   var subblock_size = code_stream[p++];
 
-  function try_read_another_byte() {
-    if (subblock_size === 0) return;
-
-    cur |= code_stream[p++] << cur_shift;
-    cur_shift += 8;
-
-    if (subblock_size === 1) {  // Never let it get to 0.
-      subblock_size = code_stream[p++];  // Next subblock.
-    } else {
-      --subblock_size;
-    }
-  }
-
   var code_table = Array(4096);
   for (var i = 0; i < clear_code; ++i) {
     code_table[i] = [i];
@@ -559,8 +546,19 @@ function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
   var prev_code = null;  // Track code-1.
 
   while (true) {
-    if (cur_shift < 16) try_read_another_byte();
-    if (cur_shift < 16) try_read_another_byte();
+    // Read up to two bytes, making sure we always 12-bits for max sized code.
+    while (cur_shift < 16) {
+      if (subblock_size === 0) break;  // No more data to be read.
+
+      cur |= code_stream[p++] << cur_shift;
+      cur_shift += 8;
+
+      if (subblock_size === 1) {  // Never let it get to 0 to hold logic above.
+        subblock_size = code_stream[p++];  // Next subblock.
+      } else {
+        --subblock_size;
+      }
+    }
 
     // TODO(deanm): We should never really get here, we should have received
     // and EOI.
