@@ -538,10 +538,10 @@ function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
   
   var subblock_size = code_stream[p++];
 
-  var code_table = Array(4096);
-  for (var i = 0; i < clear_code; ++i) {
-    code_table[i] = i;
-  }
+  // TODO(deanm): Would using a TypedArray be any faster?  At least it would
+  // solve the fast mode / backing store uncertainty.
+  // var code_table = Array(4096);
+  var code_table = new Int32Array(4096);  // Can be signed, we only use 20 bits.
 
   var prev_code = null;  // Track code-1.
 
@@ -573,10 +573,9 @@ function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
     // at least this is what you're supposed to do.  But actually our encoder
     // now doesn't emit a clear code first anyway.
     if (code === clear_code) {
-      code_table = Array(4096);
-      for (var i = 0; i < clear_code; ++i) {
-        code_table[i] = i;
-      }
+      // We don't actually have to clear the table.  This could be a good idea
+      // for greater error checking, but we don't really do any anyway.  We
+      // will just track it with next_code and overwrite old entries.
 
       next_code = eoi_code + 1;
       cur_code_size = min_code_size + 1;
