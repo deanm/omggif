@@ -491,7 +491,7 @@ function GifReader(buf) {
     return frames[frame_num];
   }
 
-  this.decodeAndBlitFrame = function(frame_num, pixels) {
+  this.decodeAndBlitFrameBGRA = function(frame_num, pixels) {
     var frame = this.frameInfo(frame_num);
     var num_pixels = frame.width * frame.height;
     var index_stream = new Uint8Array(num_pixels);  // Atmost 8-bit indices.
@@ -514,6 +514,34 @@ function GifReader(buf) {
       pixels[op++] = b;
       pixels[op++] = g;
       pixels[op++] = r;
+      pixels[op++] = 255;
+    }
+  };
+
+  // I will go to copy and paste hell one day...
+  this.decodeAndBlitFrameRGBA = function(frame_num, pixels) {
+    var frame = this.frameInfo(frame_num);
+    var num_pixels = frame.width * frame.height;
+    var index_stream = new Uint8Array(num_pixels);  // Atmost 8-bit indices.
+    GifReaderLZWOutputIndexStream(
+        buf, frame.data_offset, index_stream, num_pixels);
+    var op = 0;  // output pointer.
+    var palette_offset = frame.palette_offset;
+
+    var trans = frame.transparent_color_index;
+    // TODO(deanm): Is it faster to compare to 256 than to null?
+
+    for (var i = 0, il = index_stream.length; i < il; ++i) {
+      var index = index_stream[i];
+      if (index === trans) {
+        op += 4; continue;
+      }
+      var r = buf[palette_offset + index * 3];
+      var g = buf[palette_offset + index * 3 + 1];
+      var b = buf[palette_offset + index * 3 + 2];
+      pixels[op++] = r;
+      pixels[op++] = g;
+      pixels[op++] = b;
       pixels[op++] = 255;
     }
   };
