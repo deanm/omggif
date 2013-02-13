@@ -494,8 +494,7 @@ function GifReader(buf) {
   this.decodeAndBlitFrame = function(frame_num, pixels) {
     var frame = this.frameInfo(frame_num);
     var num_pixels = frame.width * frame.height;
-    // TODO(deanm): Can use a TypedArray here, might help performance.
-    var index_stream = Array(num_pixels);
+    var index_stream = new Uint8Array(num_pixels);  // Atmost 8-bit indices.
     GifReaderLZWOutputIndexStream(
         buf, frame.data_offset, index_stream, num_pixels);
     var op = 0;  // output pointer.
