@@ -351,4 +351,255 @@ function GifWriterOutputLZWCodeStream(buf, p, min_code_size, index_stream) {
   return p;
 }
 
-try { exports.GifWriter = GifWriter; } catch(e) { }  // CommonJS.
+function GifReader(buf) {
+  var p = 0;
+
+  // - Header.
+  if (buf[p++] !== 0x47 || buf[p++] !== 0x49 || buf[p++] !== 0x46 ||  // GIF
+      buf[p++] !== 0x38 || buf[p++] !== 0x39 || buf[p++] !== 0x61) {  // 89a
+    throw "Invalid GIF 89a header.";
+  }
+
+  // - Logical Screen Descriptor.
+  var width = buf[p++] | buf[p++] << 8;
+  var height = buf[p++] | buf[p++] << 8;
+  var pf0 = buf[p++];  // <Packed Fields>.
+  var global_palette_flag = pf0 >> 7;
+  var num_global_colors_pow2 = pf0 & 0x7;
+  var num_global_colors = 1 << (num_global_colors_pow2 + 1);
+  var background = buf[p++];
+  buf[p++];  // Pixel aspect ratio (unused?).
+
+  var global_palette_offset = null;
+
+  if (global_palette_flag) {
+    global_palette_offset = p;
+    p += num_global_colors * 3;  // Seek past palette.
+  }
+
+  var loop_count = null;
+
+  var no_eof = true;
+
+  var frames = [ ];
+
+  var delay = 0;
+  var transparent_color_index = null;
+  var loop_count = null;
+
+  while (no_eof && p < buf.length) {
+    switch (buf[p++]) {
+      case 0x21:  // Graphics Control Extension Block
+        switch (buf[p++]) {
+          case 0xff:  // Netscape / loop block.
+            if (buf[p++] !== 0x0b ||  // 21 FF already read, check block size.
+                // NETSCAPE2.0
+                buf[p++] !== 0x4e || buf[p++] !== 0x45 || buf[p++] !== 0x54 ||
+                buf[p++] !== 0x53 || buf[p++] !== 0x43 || buf[p++] !== 0x41 ||
+                buf[p++] !== 0x50 || buf[p++] !== 0x45 || buf[p++] !== 0x32 ||
+                buf[p++] !== 0x2e || buf[p++] !== 0x30 ||
+                // Sub-block
+                buf[p++] !== 0x03 || buf[p++] !== 0x01 || buf[p+2] !== 0) {
+              throw "Invalid Netscape extension block.";
+            }
+            loop_count = buf[p++] | buf[p++] << 8;
+            p++;  // Skip terminator.
+            break;
+
+          case 0xf9:  // Graphics Control Extension
+            if (buf[p++] !== 0x4 || buf[p+4] !== 0)
+              throw "Invalid graphics extension block.";
+            var pf1 = buf[p++];
+            delay = buf[p++] | buf[p++] << 8;
+            transparent_color_index = buf[p++];
+            if ((pf1 & 1) === 0) transparent_color_index = null;
+            p++;  // Skip terminator.
+            break;
+
+          default:
+            throw "Unknown graphic control label: 0x" + buf[p-1].toString(16);
+        }
+        break;
+
+      case 0x2c:  // Image Descriptor.
+        var x = buf[p++] | buf[p++] << 8;
+        var y = buf[p++] | buf[p++] << 8;
+        var w = buf[p++] | buf[p++] << 8;
+        var h = buf[p++] | buf[p++] << 8;
+        var pf2 = buf[p++];
+        var local_palette_flag = pf2 >> 7;
+        var num_local_colors_pow2 = pf2 & 0x7;
+        var num_local_colors = 1 << (num_local_colors_pow2 + 1);
+        var palette_offset = global_palette_offset;
+        var has_local_palette = false;
+        if (local_palette_flag) {
+          var has_local_palette = true;
+          palette_offset = p;  // Override with local palette.
+          p += num_local_colors * 3;  // Seek past palette.
+        }
+
+        var data_offset = p;
+
+        p++;  // codesize
+        while (true) {
+          var block_size = buf[p++];
+          if (block_size === 0) break;
+          p += block_size;
+        }
+
+        frames.push({x: x, y: y, width: w, height: h,
+                     has_local_palette: has_local_palette,
+                     palette_offset: palette_offset,
+                     data_offset: data_offset,
+                     transparent_color_index: transparent_color_index});
+        break;
+
+      case 0x3b:  // Trailer Marker (end of file).
+        no_eof = false;
+        break;
+
+      default:
+        throw "Unknown gif block: 0x" + buf[p-1].toString(16);
+        break;
+    }
+  }
+
+  this.numFrames = function() {
+    return frames.length;
+  };
+
+  this.frameInfo = function(frame_num) {
+    if (frame_num < 0 || frame_num >= frames.length)
+      throw "Frame index out of range.";
+    return frames[frame_num];
+  }
+
+  this.decodeAndBlitFrame = function(frame_num, pixels) {
+    var frame = this.frameInfo(frame_num);
+    var index_stream = GifReaderLZWOutputIndexStream(buf, frame.data_offset);
+    var op = 0;  // output pointer.
+    var palette_offset = frame.palette_offset;
+
+    var trans = frame.transparent_color_index;
+    // TODO(deanm): Is it faster to compare to 256 than to null?
+
+    for (var i = 0, il = index_stream.length; i < il; ++i) {
+      var index = index_stream[i];
+      if (index === trans) {
+        op += 4; continue;
+      }
+      var r = buf[palette_offset + index * 3];
+      var g = buf[palette_offset + index * 3 + 1];
+      var b = buf[palette_offset + index * 3 + 2];
+      pixels[op++] = b;
+      pixels[op++] = g;
+      pixels[op++] = r;
+      pixels[op++] = 255;
+    }
+  };
+}
+
+function GifReaderLZWOutputIndexStream(code_stream, p) {
+  var min_code_size = code_stream[p++];
+
+  var clear_code = 1 << min_code_size;
+  var eoi_code = clear_code + 1;
+  var next_code = eoi_code + 1;
+
+  var cur_code_size = min_code_size + 1;  // Number of bits per code.
+  // NOTE: This shares the same name as the encoder, but has a different
+  // meaning here.  Here this masks each code coming from the code stream.
+  var code_mask = (1 << cur_code_size) - 1;
+  var cur_shift = 0;
+  var cur = 0;
+  
+  var subblock_size = code_stream[p++];
+
+  function try_read_another_byte() {
+    if (subblock_size === 0) return;
+
+    cur |= code_stream[p++] << cur_shift;
+    cur_shift += 8;
+
+    if (subblock_size === 1) {  // Never let it get to 0.
+      subblock_size = code_stream[p++];  // Next subblock.
+    } else {
+      --subblock_size;
+    }
+  }
+
+  var code_table = Array(4096);
+  for (var i = 0; i < clear_code; ++i) {
+    code_table[i] = [i];
+  }
+
+  var prev_code = null;  // Track code-1.
+
+  var output = [ ];
+
+  while (true) {
+    if (cur_shift < 16) try_read_another_byte();
+    if (cur_shift < 16) try_read_another_byte();
+
+    // TODO(deanm): We should never really get here, we should have received
+    // and EOI.
+    if (cur_shift < cur_code_size)
+      break;
+
+    var code = cur & code_mask;
+    cur >>= cur_code_size;
+    cur_shift -= cur_code_size;
+
+    // TODO(deanm): Maybe should check that the first code was a clear code,
+    // at least this is what you're supposed to do.  But actually our encoder
+    // now doesn't emit a clear code first anyway.
+    if (code === clear_code) {
+      code_table = Array(4096);
+      for (var i = 0; i < clear_code; ++i) {
+        code_table[i] = [i];
+      }
+
+      next_code = eoi_code + 1;
+      cur_code_size = min_code_size + 1;
+      code_mask = (1 << cur_code_size) - 1;
+
+      // Don't update prev_code ?
+      prev_code = null;
+      continue;
+    } else if (code === eoi_code) {
+      break;
+    }
+
+    var index = code_table[code];
+
+    if (index !== undefined) {
+      output = output.concat(index);
+      var k = index[0];
+      if (prev_code !== null) {
+        var next_entry = code_table[prev_code].concat([k]);
+        code_table[next_code++] = next_entry;
+      }
+    } else {
+      var k = code_table[prev_code][0];
+      var next_entry = code_table[prev_code].concat([k]);
+      output = output.concat(next_entry);
+      code_table[next_code++] = next_entry;
+    }
+
+    // TODO(deanm): Figure out this clearing vs code growth logic better.  I
+    // have an feeling that it should just happen somewhere else, for now it
+    // is awkward between when we grow past the max and then hit a clear code.
+    // For now just check if we hit the max 12-bits (then a clear code should
+    // follow, also of course encoded in 12-bits).
+    if (next_code >= code_mask+1 && cur_code_size < 12) {
+      ++cur_code_size;
+      code_mask = code_mask << 1 | 1;
+    }
+
+    prev_code = code;
+  }
+
+  return output;
+}
+
+try { exports.GifWriter = GifWriter; exports.GifReader = GifReader } catch(e) { }  // CommonJS.
