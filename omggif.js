@@ -283,6 +283,8 @@ function GifWriterOutputLZWCodeStream(buf, p, min_code_size, index_stream) {
   var ib_code = index_stream[0] & code_mask;  // Load first input index.
   var code_table = { };  // Key'd on our 20-bit "tuple".
 
+  emit_code(clear_code);  // Spec says first code should be a clear code.
+
   // First index already loaded, process the rest of the stream.
   for (var i = 1, il = index_stream.length; i < il; ++i) {
     var k = index_stream[i] & code_mask;
