@@ -476,7 +476,11 @@ function GifReader(buf) {
 
   this.decodeAndBlitFrame = function(frame_num, pixels) {
     var frame = this.frameInfo(frame_num);
-    var index_stream = GifReaderLZWOutputIndexStream(buf, frame.data_offset);
+    var num_pixels = frame.width * frame.height;
+    // TODO(deanm): Can use a TypedArray here, might help performance.
+    var index_stream = Array(num_pixels);
+    GifReaderLZWOutputIndexStream(
+        buf, frame.data_offset, index_stream, num_pixels);
     var op = 0;  // output pointer.
     var palette_offset = frame.palette_offset;
 
@@ -499,7 +503,7 @@ function GifReader(buf) {
   };
 }
 
-function GifReaderLZWOutputIndexStream(code_stream, p) {
+function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
   var min_code_size = code_stream[p++];
 
   var clear_code = 1 << min_code_size;
@@ -512,6 +516,8 @@ function GifReaderLZWOutputIndexStream(code_stream, p) {
   var code_mask = (1 << cur_code_size) - 1;
   var cur_shift = 0;
   var cur = 0;
+
+  var op = 0;  // Output pointer.
   
   var subblock_size = code_stream[p++];
 
@@ -534,8 +540,6 @@ function GifReaderLZWOutputIndexStream(code_stream, p) {
   }
 
   var prev_code = null;  // Track code-1.
-
-  var output = [ ];
 
   while (true) {
     if (cur_shift < 16) try_read_another_byte();
@@ -572,8 +576,10 @@ function GifReaderLZWOutputIndexStream(code_stream, p) {
 
     var index = code_table[code];
 
+    var indices_to_emit = null;
+
     if (index !== undefined) {
-      output = output.concat(index);
+      indices_to_emit = index;
       var k = index[0];
       if (prev_code !== null) {
         var next_entry = code_table[prev_code].concat([k]);
@@ -582,8 +588,16 @@ function GifReaderLZWOutputIndexStream(code_stream, p) {
     } else {
       var k = code_table[prev_code][0];
       var next_entry = code_table[prev_code].concat([k]);
-      output = output.concat(next_entry);
+      indices_to_emit = next_entry;
       code_table[next_code++] = next_entry;
+    }
+
+    for (var i = 0, il = indices_to_emit.length; i < il; ++i) {
+      if (op >= output_length) {
+        console.log("Warning, gif stream longer than expected.");
+        return;
+      }
+      output[op++] = indices_to_emit[i];
     }
 
     // TODO(deanm): Figure out this clearing vs code growth logic better.  I
@@ -597,6 +611,10 @@ function GifReaderLZWOutputIndexStream(code_stream, p) {
     }
 
     prev_code = code;
+  }
+
+  if (op !== output_length) {
+    console.log("Warning, gif stream shorter than expected.");
   }
 
   return output;
