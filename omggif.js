@@ -611,13 +611,13 @@ function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
     }
     */
 
-    chase = code_table[chase_code];
-    var b = op;
     op += chase_length;
+    var b = op;  // Track pointer, writing backwards.
+    chase = chase_code;
     while (chase_length--) {
-      // console.log(['output', b, chase_length, chase & 0xff]);
-      output[b + chase_length] = chase & 0xff;
-      chase = code_table[chase >> 8];
+      chase = code_table[chase];
+      output[--b] = chase & 0xff;  // Write backwards.
+      chase >>= 8;
     }
 
     if (chase_code !== code)  // The case of emitting {CODE-1} + k.
