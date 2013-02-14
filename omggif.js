@@ -385,6 +385,7 @@ function GifReader(buf) {
 
   var delay = 0;
   var transparent_index = null;
+  var disposal = 0;  // 0 - No disposal specified.
   var loop_count = null;
 
   this.width = width;
@@ -424,6 +425,7 @@ function GifReader(buf) {
             delay = buf[p++] | buf[p++] << 8;
             transparent_index = buf[p++];
             if ((pf1 & 1) === 0) transparent_index = null;
+            disposal = pf1 >> 2 & 0x7;
             p++;  // Skip terminator.
             break;
 
@@ -472,7 +474,8 @@ function GifReader(buf) {
                      palette_offset: palette_offset,
                      data_offset: data_offset,
                      transparent_index: transparent_index,
-                     delay: delay});
+                     delay: delay,
+                     disposal: disposal});
         break;
 
       case 0x3b:  // Trailer Marker (end of file).
