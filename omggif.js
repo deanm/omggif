@@ -503,8 +503,11 @@ function GifReader(buf) {
         buf, frame.data_offset, index_stream, num_pixels);
     var palette_offset = frame.palette_offset;
 
+    // NOTE(deanm): It seems to be much faster to compare index to 256 than
+    // to === null.  Not sure why, but CompareStub_EQ_STRICT shows up high in
+    // the profile, not sure if it's related to using a Uint8Array.
     var trans = frame.transparent_color_index;
-    // TODO(deanm): Is it faster to compare to 256 than to null?
+    if (trans === null) trans = 256;
 
     var wstride = (width - frame.width) * 4;
     var op = ((frame.y * width) + frame.x) * 4;  // output pointer.
@@ -542,8 +545,11 @@ function GifReader(buf) {
     var op = 0;  // output pointer.
     var palette_offset = frame.palette_offset;
 
+    // NOTE(deanm): It seems to be much faster to compare index to 256 than
+    // to === null.  Not sure why, but CompareStub_EQ_STRICT shows up high in
+    // the profile, not sure if it's related to using a Uint8Array.
     var trans = frame.transparent_color_index;
-    // TODO(deanm): Is it faster to compare to 256 than to null?
+    if (trans === null) trans = 256;
 
     var wstride = (width - frame.width) * 4;
     var op = ((frame.y * width) + frame.x) * 4;  // output pointer.
