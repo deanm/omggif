@@ -384,7 +384,7 @@ function GifReader(buf) {
   var frames = [ ];
 
   var delay = 0;
-  var transparent_color_index = null;
+  var transparent_index = null;
   var loop_count = null;
 
   this.width = width;
@@ -422,8 +422,8 @@ function GifReader(buf) {
               throw "Invalid graphics extension block.";
             var pf1 = buf[p++];
             delay = buf[p++] | buf[p++] << 8;
-            transparent_color_index = buf[p++];
-            if ((pf1 & 1) === 0) transparent_color_index = null;
+            transparent_index = buf[p++];
+            if ((pf1 & 1) === 0) transparent_index = null;
             p++;  // Skip terminator.
             break;
 
@@ -471,7 +471,7 @@ function GifReader(buf) {
                      has_local_palette: has_local_palette,
                      palette_offset: palette_offset,
                      data_offset: data_offset,
-                     transparent_color_index: transparent_color_index,
+                     transparent_index: transparent_index,
                      delay: delay});
         break;
 
@@ -506,7 +506,7 @@ function GifReader(buf) {
     // NOTE(deanm): It seems to be much faster to compare index to 256 than
     // to === null.  Not sure why, but CompareStub_EQ_STRICT shows up high in
     // the profile, not sure if it's related to using a Uint8Array.
-    var trans = frame.transparent_color_index;
+    var trans = frame.transparent_index;
     if (trans === null) trans = 256;
 
     var wstride = (width - frame.width) * 4;
@@ -548,7 +548,7 @@ function GifReader(buf) {
     // NOTE(deanm): It seems to be much faster to compare index to 256 than
     // to === null.  Not sure why, but CompareStub_EQ_STRICT shows up high in
     // the profile, not sure if it's related to using a Uint8Array.
-    var trans = frame.transparent_color_index;
+    var trans = frame.transparent_index;
     if (trans === null) trans = 256;
 
     var wstride = (width - frame.width) * 4;
