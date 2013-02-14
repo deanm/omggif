@@ -540,7 +540,7 @@ function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
 
   var code_table = Array(4096);
   for (var i = 0; i < clear_code; ++i) {
-    code_table[i] = [i];
+    code_table[i] = i;
   }
 
   var prev_code = null;  // Track code-1.
@@ -575,7 +575,7 @@ function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
     if (code === clear_code) {
       code_table = Array(4096);
       for (var i = 0; i < clear_code; ++i) {
-        code_table[i] = [i];
+        code_table[i] = i;
       }
 
       next_code = eoi_code + 1;
@@ -589,30 +589,42 @@ function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
       break;
     }
 
-    var index = code_table[code];
+    var chase_code = code < next_code ? code : prev_code;
 
-    var indices_to_emit = null;
-
-    if (index !== undefined) {
-      indices_to_emit = index;
-      var k = index[0];
-      if (prev_code !== null) {
-        var next_entry = code_table[prev_code].concat([k]);
-        code_table[next_code++] = next_entry;
-      }
-    } else {
-      var k = code_table[prev_code][0];
-      var next_entry = code_table[prev_code].concat([k]);
-      indices_to_emit = next_entry;
-      code_table[next_code++] = next_entry;
+    // Chase what we will output, either {CODE} or {CODE-1}.
+    var chase_length = 0;
+    var chase = chase_code;
+    while (chase > clear_code) {
+      chase = code_table[chase] >> 8;
+      ++chase_length;
     }
 
-    for (var i = 0, il = indices_to_emit.length; i < il; ++i) {
-      if (op >= output_length) {
-        console.log("Warning, gif stream longer than expected.");
-        return;
-      }
-      output[op++] = indices_to_emit[i];
+    var k = chase;
+
+    // Already have the first byte from the chase, might as well write it fast.
+    output[op++] = k;
+
+    /*
+    if (op + chase_length >= output_length) {
+      console.log("Warning, gif stream longer than expected.");
+      return;
+    }
+    */
+
+    chase = code_table[chase_code];
+    var b = op;
+    op += chase_length;
+    while (chase_length--) {
+      // console.log(['output', b, chase_length, chase & 0xff]);
+      output[b + chase_length] = chase & 0xff;
+      chase = code_table[chase >> 8];
+    }
+
+    if (chase_code !== code)  // The case of emitting {CODE-1} + k.
+      output[op++] = k;
+
+    if (prev_code !== null) {
+      code_table[next_code++] = prev_code << 8 | k;
     }
 
     // TODO(deanm): Figure out this clearing vs code growth logic better.  I
