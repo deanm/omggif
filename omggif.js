@@ -640,6 +640,25 @@ function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
       break;
     }
 
+    // We have a similar situation as the decoder, where we want to store
+    // variable length entries (code table entries), but we want to do in a
+    // faster manner than an array of arrays.  The code below stores sort of a
+    // linked list within the code table, and then "chases" through it to
+    // construct the dictionary entries.  When a new entry is created, just the
+    // last byte is stored, and the rest (prefix) of the entry is only
+    // referenced by its table entry.  Then the code chases through the
+    // prefixes until it reaches a single byte code.  We have to chase twice,
+    // first to compute the length, and then to actually copy the data to the
+    // output (backwards, since we know the length).  The alternative would be
+    // storing something in an intermediate stack, but that doesn't make any
+    // more sense.  I implemented an approach where it also stored the length
+    // in the code table, although it's a bit tricky because you run out of
+    // bits (12 + 12 + 8), but I didn't measure much improvements (the table
+    // entries are generally not the long).  Even when I created benchmarks for
+    // very long table entries the complexity did not seem worth it.
+    // The code table stores the prefix entry in 12 bits and then the suffix
+    // byte in 8 bits, so each entry is 20 bits.
+
     var chase_code = code < next_code ? code : prev_code;
 
     // Chase what we will output, either {CODE} or {CODE-1}.
@@ -671,7 +690,7 @@ function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
     while (chase_length--) {
       chase = code_table[chase];
       output[--b] = chase & 0xff;  // Write backwards.
-      chase >>= 8;
+      chase >>= 8;  // Pull down to the prefix code.
     }
 
     if (prev_code !== null && next_code < 4096) {
