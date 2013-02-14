@@ -387,6 +387,9 @@ function GifReader(buf) {
   var transparent_color_index = null;
   var loop_count = null;
 
+  this.width = width;
+  this.height = height;
+
   while (no_eof && p < buf.length) {
     switch (buf[p++]) {
       case 0x21:  // Graphics Control Extension Block
@@ -468,7 +471,8 @@ function GifReader(buf) {
                      has_local_palette: has_local_palette,
                      palette_offset: palette_offset,
                      data_offset: data_offset,
-                     transparent_color_index: transparent_color_index});
+                     transparent_color_index: transparent_color_index,
+                     delay: delay});
         break;
 
       case 0x3b:  // Trailer Marker (end of file).
@@ -497,24 +501,34 @@ function GifReader(buf) {
     var index_stream = new Uint8Array(num_pixels);  // Atmost 8-bit indices.
     GifReaderLZWOutputIndexStream(
         buf, frame.data_offset, index_stream, num_pixels);
-    var op = 0;  // output pointer.
     var palette_offset = frame.palette_offset;
 
     var trans = frame.transparent_color_index;
     // TODO(deanm): Is it faster to compare to 256 than to null?
 
+    var wstride = (width - frame.width) * 4;
+    var op = ((frame.y * width) + frame.x) * 4;  // output pointer.
+    var linex = frame.width;
+
     for (var i = 0, il = index_stream.length; i < il; ++i) {
       var index = index_stream[i];
+
       if (index === trans) {
-        op += 4; continue;
+        op += 4;
+      } else {
+        var r = buf[palette_offset + index * 3];
+        var g = buf[palette_offset + index * 3 + 1];
+        var b = buf[palette_offset + index * 3 + 2];
+        pixels[op++] = b;
+        pixels[op++] = g;
+        pixels[op++] = r;
+        pixels[op++] = 255;
       }
-      var r = buf[palette_offset + index * 3];
-      var g = buf[palette_offset + index * 3 + 1];
-      var b = buf[palette_offset + index * 3 + 2];
-      pixels[op++] = b;
-      pixels[op++] = g;
-      pixels[op++] = r;
-      pixels[op++] = 255;
+
+      if (--linex === 0) {
+        op += wstride;
+        linex = frame.width;
+      }
     }
   };
 
@@ -531,18 +545,29 @@ function GifReader(buf) {
     var trans = frame.transparent_color_index;
     // TODO(deanm): Is it faster to compare to 256 than to null?
 
+    var wstride = (width - frame.width) * 4;
+    var op = ((frame.y * width) + frame.x) * 4;  // output pointer.
+    var linex = frame.width;
+
     for (var i = 0, il = index_stream.length; i < il; ++i) {
       var index = index_stream[i];
+
       if (index === trans) {
-        op += 4; continue;
+        op += 4;
+      } else {
+        var r = buf[palette_offset + index * 3];
+        var g = buf[palette_offset + index * 3 + 1];
+        var b = buf[palette_offset + index * 3 + 2];
+        pixels[op++] = r;
+        pixels[op++] = g;
+        pixels[op++] = b;
+        pixels[op++] = 255;
       }
-      var r = buf[palette_offset + index * 3];
-      var g = buf[palette_offset + index * 3 + 1];
-      var b = buf[palette_offset + index * 3 + 2];
-      pixels[op++] = r;
-      pixels[op++] = g;
-      pixels[op++] = b;
-      pixels[op++] = 255;
+
+      if (--linex === 0) {
+        op += wstride;
+        linex = frame.width;
+      }
     }
   };
 }
