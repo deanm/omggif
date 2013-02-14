@@ -651,16 +651,15 @@ function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
     }
 
     var k = chase;
-
-    // Already have the first byte from the chase, might as well write it fast.
-    output[op++] = k;
-
-    /*
-    if (op + chase_length >= output_length) {
+    
+    var op_end = op + chase_length + (chase_code !== code ? 1 : 0);
+    if (op_end > output_length) {
       console.log("Warning, gif stream longer than expected.");
       return;
     }
-    */
+
+    // Already have the first byte from the chase, might as well write it fast.
+    output[op++] = k;
 
     op += chase_length;
     var b = op;  // Track pointer, writing backwards.
