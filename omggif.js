@@ -473,6 +473,7 @@ function GifReader(buf) {
                      has_local_palette: has_local_palette,
                      palette_offset: palette_offset,
                      data_offset: data_offset,
+                     data_length: p - data_offset,
                      transparent_index: transparent_index,
                      delay: delay,
                      disposal: disposal});
