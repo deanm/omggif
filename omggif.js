@@ -342,7 +342,7 @@ function GifWriterOutputLZWCodeStream(buf, p, min_code_size, index_stream) {
   // Finish the sub-blocks, writing out any unfinished lengths and
   // terminating with a sub-block of length 0.  If we have already started
   // but not yet used a sub-block it can just become the terminator.
-  if (p + 1 === cur_subblock) {  // Started but unused.
+  if (cur_subblock + 1 === p) {  // Started but unused.
     buf[cur_subblock] = 0;
   } else {  // Started and used, write length and additional terminator block.
     buf[cur_subblock] = p - cur_subblock - 1;
