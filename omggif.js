@@ -20,9 +20,9 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 //
-// omggif is a JavaScript implementation of a GIF 89a encoder, including
-// animation and compression.  It does not rely on any specific underlying
-// system, so should run in the browser, Node, or Plask.
+// omggif is a JavaScript implementation of a GIF 89a encoder and decoder,
+// including animation and compression.  It does not rely on any specific
+// underlying system, so should run in the browser, Node, or Plask.
 
 function GifWriter(buf, width, height, gopts) {
   var p = 0;
