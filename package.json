@@ -1,0 +1,11 @@
+{
+  "name": "omggif",
+  "version": "1.0.5",
+  "author": "Dean McNamee <dean@gmail.com>",
+  "keywords": ["gif", "gif89a", "plask"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/deanm/omggif"
+  },
+  "main": "omggif.js"
+}
