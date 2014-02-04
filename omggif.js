@@ -453,6 +453,7 @@ function GifReader(buf) {
         var num_local_colors_pow2 = pf2 & 0x7;
         var num_local_colors = 1 << (num_local_colors_pow2 + 1);
         var palette_offset = global_palette_offset;
+        var interlaced = !!(pf2 & 0x40);
         var has_local_palette = false;
         if (local_palette_flag) {
           var has_local_palette = true;
@@ -476,7 +477,8 @@ function GifReader(buf) {
                      data_length: p - data_offset,
                      transparent_index: transparent_index,
                      delay: delay,
-                     disposal: disposal});
+                     disposal: disposal,
+                     interlaced:interlaced});
         break;
 
       case 0x3b:  // Trailer Marker (end of file).
@@ -516,20 +518,55 @@ function GifReader(buf) {
     var wstride = (width - frame.width) * 4;
     var op = ((frame.y * width) + frame.x) * 4;  // output pointer.
     var linex = frame.width;
+    
+    var interlacing = [
+      [ 0, 8 ],
+	    [ 4, 8 ],
+	    [ 2, 4 ],
+	    [ 1, 2 ],
+	    [ 0, 0 ]
+    ];
+    
+    var interlace_row = 0, interlace_col = 0, interlace_pointer = 0; 
 
     for (var i = 0, il = index_stream.length; i < il; ++i) {
       var index = index_stream[i];
 
       if (index === trans) {
         op += 4;
+        if (++interlace_col >= frame.width) {
+          interlace_col = 0;
+          interlace_row += interlacing[interlace_pointer][1];
+          if (interlace_row >= frame.height) {
+	          interlace_row = interlacing[++interlace_pointer][0]; 
+	        }
+        }
       } else {
         var r = buf[palette_offset + index * 3];
         var g = buf[palette_offset + index * 3 + 1];
         var b = buf[palette_offset + index * 3 + 2];
-        pixels[op++] = b;
-        pixels[op++] = g;
-        pixels[op++] = r;
-        pixels[op++] = 255;
+        
+        if(frame.interlaced) {
+          var interlace_index = (interlace_row * frame.width + interlace_col) * 4;  
+
+          pixels[interlace_index] = b;
+          pixels[interlace_index+1] = g;
+          pixels[interlace_index+2] = r;
+          pixels[interlace_index+3] = 255;
+         
+          if (++interlace_col >= frame.width) {
+	          interlace_col = 0;
+	          interlace_row += interlacing[interlace_pointer][1];
+	          if (interlace_row >= frame.height) {
+		          interlace_row = interlacing[++interlace_pointer][0]; 
+		        }
+          }
+        } else{ 
+          pixels[op++] = b;
+          pixels[op++] = g;
+          pixels[op++] = r;
+          pixels[op++] = 255;
+        }
       }
 
       if (--linex === 0) {
@@ -558,20 +595,58 @@ function GifReader(buf) {
     var wstride = (width - frame.width) * 4;
     var op = ((frame.y * width) + frame.x) * 4;  // output pointer.
     var linex = frame.width;
+    
+    var interlacing = [
+      [ 0, 8 ],
+	    [ 4, 8 ],
+	    [ 2, 4 ],
+	    [ 1, 2 ],
+	    [ 0, 0 ]
+    ];
+    
+    var interlace_row = 0, interlace_col = 0, interlace_pointer = 0; 
 
     for (var i = 0, il = index_stream.length; i < il; ++i) {
       var index = index_stream[i];
 
       if (index === trans) {
         op += 4;
+        if (++interlace_col >= frame.width) {
+          interlace_col = 0;
+          interlace_row += interlacing[interlace_pointer][1];
+          if (interlace_row >= frame.height) {
+	          interlace_row = interlacing[++interlace_pointer][0]; 
+	        }
+        }
       } else {
         var r = buf[palette_offset + index * 3];
         var g = buf[palette_offset + index * 3 + 1];
         var b = buf[palette_offset + index * 3 + 2];
-        pixels[op++] = r;
-        pixels[op++] = g;
-        pixels[op++] = b;
-        pixels[op++] = 255;
+
+        if(frame.interlaced) {
+          var interlace_index = (interlace_row * frame.width + interlace_col) * 4;  
+          
+          pixels[interlace_index] = r;
+          pixels[interlace_index+1] = g;
+          pixels[interlace_index+2] = b;
+          pixels[interlace_index+3] = 255;
+         
+          if (++interlace_col >= frame.width) {
+	          interlace_col = 0;
+	          interlace_row += interlacing[interlace_pointer][1];
+	          if (interlace_row >= frame.height) {
+		          interlace_row = interlacing[++interlace_pointer][0]; 
+		        }
+          }
+          
+        } else {
+        
+          pixels[op++] = r;
+          pixels[op++] = g;
+          pixels[op++] = b;
+          pixels[op++] = 255;
+          
+        }
       }
 
       if (--linex === 0) {
