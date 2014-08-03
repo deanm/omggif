@@ -546,7 +546,6 @@ function GifReader(buf) {
     var index_stream = new Uint8Array(num_pixels);  // Atmost 8-bit indices.
     GifReaderLZWOutputIndexStream(
         buf, frame.data_offset, index_stream, num_pixels);
-    var op = 0;  // output pointer.
     var palette_offset = frame.palette_offset;
 
     // NOTE(deanm): It seems to be much faster to compare index to 256 than
