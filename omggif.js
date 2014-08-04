@@ -450,6 +450,7 @@ function GifReader(buf) {
         var h = buf[p++] | buf[p++] << 8;
         var pf2 = buf[p++];
         var local_palette_flag = pf2 >> 7;
+        var interlace_flag = pf2 >> 6 & 1;
         var num_local_colors_pow2 = pf2 & 0x7;
         var num_local_colors = 1 << (num_local_colors_pow2 + 1);
         var palette_offset = global_palette_offset;
@@ -475,6 +476,7 @@ function GifReader(buf) {
                      data_offset: data_offset,
                      data_length: p - data_offset,
                      transparent_index: transparent_index,
+                     interlaced: !!interlace_flag,
                      delay: delay,
                      disposal: disposal});
         break;
@@ -502,7 +504,7 @@ function GifReader(buf) {
   this.decodeAndBlitFrameBGRA = function(frame_num, pixels) {
     var frame = this.frameInfo(frame_num);
     var num_pixels = frame.width * frame.height;
-    var index_stream = new Uint8Array(num_pixels);  // Atmost 8-bit indices.
+    var index_stream = new Uint8Array(num_pixels);  // At most 8-bit indices.
     GifReaderLZWOutputIndexStream(
         buf, frame.data_offset, index_stream, num_pixels);
     var palette_offset = frame.palette_offset;
@@ -513,12 +515,42 @@ function GifReader(buf) {
     var trans = frame.transparent_index;
     if (trans === null) trans = 256;
 
-    var wstride = (width - frame.width) * 4;
-    var op = ((frame.y * width) + frame.x) * 4;  // output pointer.
-    var linex = frame.width;
+    // We are possibly just blitting to a portion of the entire frame.
+    // That is a subrect within the framerect, so the additional pixels
+    // must be skipped over after we finished a scanline.
+    var framewidth  = frame.width;
+    var framestride = width - framewidth;
+    var xleft       = framewidth;  // Number of subrect pixels left in scanline.
+
+    // Output indicies of the top left and bottom right corners of the subrect.
+    var opbeg = ((frame.y * width) + frame.x) * 4;
+    var opend = ((frame.y + frame.height) * width + frame.x) * 4;
+    var op    = opbeg;
+
+    var scanstride = framestride * 4;
+
+    // Use scanstride to skip past the rows when interlacing.  This is skipping
+    // 7 rows for the first two passes, then 3 then 1.
+    if (frame.interlaced === true) {
+      scanstride += (framewidth + framestride) * 4 * 7;  // Pass 1.
+    }
+
+    var interlaceskip = 8;  // Tracking the row interval in the current pass.
 
     for (var i = 0, il = index_stream.length; i < il; ++i) {
       var index = index_stream[i];
+
+      if (xleft === 0) {  // Beginning of new scan line
+        op += scanstride;
+        xleft = framewidth;
+        if (op >= opend) { // Catch the wrap to switch passes when interlacing.
+          scanstride =
+              framestride + (framewidth + framestride) * 4 * (interlaceskip-1);
+          // interlaceskip / 2 * 4 is interlaceskip << 1.
+          op = opbeg + (framewidth + framestride) * (interlaceskip << 1);
+          interlaceskip >>= 1;
+        }
+      }
 
       if (index === trans) {
         op += 4;
@@ -531,11 +563,7 @@ function GifReader(buf) {
         pixels[op++] = r;
         pixels[op++] = 255;
       }
-
-      if (--linex === 0) {
-        op += wstride;
-        linex = frame.width;
-      }
+      --xleft;
     }
   };
 
@@ -543,7 +571,7 @@ function GifReader(buf) {
   this.decodeAndBlitFrameRGBA = function(frame_num, pixels) {
     var frame = this.frameInfo(frame_num);
     var num_pixels = frame.width * frame.height;
-    var index_stream = new Uint8Array(num_pixels);  // Atmost 8-bit indices.
+    var index_stream = new Uint8Array(num_pixels);  // At most 8-bit indices.
     GifReaderLZWOutputIndexStream(
         buf, frame.data_offset, index_stream, num_pixels);
     var palette_offset = frame.palette_offset;
@@ -554,12 +582,42 @@ function GifReader(buf) {
     var trans = frame.transparent_index;
     if (trans === null) trans = 256;
 
-    var wstride = (width - frame.width) * 4;
-    var op = ((frame.y * width) + frame.x) * 4;  // output pointer.
-    var linex = frame.width;
+    // We are possibly just blitting to a portion of the entire frame.
+    // That is a subrect within the framerect, so the additional pixels
+    // must be skipped over after we finished a scanline.
+    var framewidth  = frame.width;
+    var framestride = width - framewidth;
+    var xleft       = framewidth;  // Number of subrect pixels left in scanline.
+
+    // Output indicies of the top left and bottom right corners of the subrect.
+    var opbeg = ((frame.y * width) + frame.x) * 4;
+    var opend = ((frame.y + frame.height) * width + frame.x) * 4;
+    var op    = opbeg;
+
+    var scanstride = framestride * 4;
+
+    // Use scanstride to skip past the rows when interlacing.  This is skipping
+    // 7 rows for the first two passes, then 3 then 1.
+    if (frame.interlaced === true) {
+      scanstride += (framewidth + framestride) * 4 * 7;  // Pass 1.
+    }
+
+    var interlaceskip = 8;  // Tracking the row interval in the current pass.
 
     for (var i = 0, il = index_stream.length; i < il; ++i) {
       var index = index_stream[i];
+
+      if (xleft === 0) {  // Beginning of new scan line
+        op += scanstride;
+        xleft = framewidth;
+        if (op >= opend) { // Catch the wrap to switch passes when interlacing.
+          scanstride =
+              framestride + (framewidth + framestride) * 4 * (interlaceskip-1);
+          // interlaceskip / 2 * 4 is interlaceskip << 1.
+          op = opbeg + (framewidth + framestride) * (interlaceskip << 1);
+          interlaceskip >>= 1;
+        }
+      }
 
       if (index === trans) {
         op += 4;
@@ -572,11 +630,7 @@ function GifReader(buf) {
         pixels[op++] = b;
         pixels[op++] = 255;
       }
-
-      if (--linex === 0) {
-        op += wstride;
-        linex = frame.width;
-      }
+      --xleft;
     }
   };
 }
