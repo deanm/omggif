@@ -377,8 +377,6 @@ function GifReader(buf) {
     p += num_global_colors * 3;  // Seek past palette.
   }
 
-  var loop_count = null;
-
   var no_eof = true;
 
   var frames = [ ];
@@ -493,6 +491,10 @@ function GifReader(buf) {
 
   this.numFrames = function() {
     return frames.length;
+  };
+
+  this.loopCount = function() {
+    return loop_count;
   };
 
   this.frameInfo = function(frame_num) {
