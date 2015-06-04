@@ -534,7 +534,7 @@ function GifReader(buf) {
     // Use scanstride to skip past the rows when interlacing.  This is skipping
     // 7 rows for the first two passes, then 3 then 1.
     if (frame.interlaced === true) {
-      scanstride += (framewidth + framestride) * 4 * 7;  // Pass 1.
+      scanstride += width * 4 * 7;  // Pass 1.
     }
 
     var interlaceskip = 8;  // Tracking the row interval in the current pass.
@@ -546,8 +546,7 @@ function GifReader(buf) {
         op += scanstride;
         xleft = framewidth;
         if (op >= opend) { // Catch the wrap to switch passes when interlacing.
-          scanstride =
-              framestride + (framewidth + framestride) * 4 * (interlaceskip-1);
+          scanstride = framestride * 4 + width * 4 * (interlaceskip-1);
           // interlaceskip / 2 * 4 is interlaceskip << 1.
           op = opbeg + (framewidth + framestride) * (interlaceskip << 1);
           interlaceskip >>= 1;
@@ -601,7 +600,7 @@ function GifReader(buf) {
     // Use scanstride to skip past the rows when interlacing.  This is skipping
     // 7 rows for the first two passes, then 3 then 1.
     if (frame.interlaced === true) {
-      scanstride += (framewidth + framestride) * 4 * 7;  // Pass 1.
+      scanstride += width * 4 * 7;  // Pass 1.
     }
 
     var interlaceskip = 8;  // Tracking the row interval in the current pass.
@@ -613,8 +612,7 @@ function GifReader(buf) {
         op += scanstride;
         xleft = framewidth;
         if (op >= opend) { // Catch the wrap to switch passes when interlacing.
-          scanstride =
-              framestride + (framewidth + framestride) * 4 * (interlaceskip-1);
+          scanstride = framestride * 4 + width * 4 * (interlaceskip-1);
           // interlaceskip / 2 * 4 is interlaceskip << 1.
           op = opbeg + (framewidth + framestride) * (interlaceskip << 1);
           interlaceskip >>= 1;
