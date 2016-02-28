@@ -31,7 +31,7 @@ plask.simpleWindow({
       pixels.clear(0, 0, 0, 255);
 
     var start = Date.now();
-    gr.decodeAndBlitFrameBGRA(frame_num, pixels);
+    gr.decodeAndBlitFrameBGRA(frame_num, pixels.pixels || pixels);
     console.log('Decoded and blit frame in: '  + (Date.now() - start) + 'ms');
 
     canvas.drawCanvas(paint, pixels, 0, 0, gr.width, gr.height);
