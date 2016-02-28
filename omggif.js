@@ -371,9 +371,11 @@ function GifReader(buf) {
   buf[p++];  // Pixel aspect ratio (unused?).
 
   var global_palette_offset = null;
+  var global_palette_size   = null;
 
   if (global_palette_flag) {
     global_palette_offset = p;
+    global_palette_size = num_global_colors;
     p += num_global_colors * 3;  // Seek past palette.
   }
 
@@ -452,10 +454,12 @@ function GifReader(buf) {
         var num_local_colors_pow2 = pf2 & 0x7;
         var num_local_colors = 1 << (num_local_colors_pow2 + 1);
         var palette_offset = global_palette_offset;
+        var palette_size = global_palette_size;
         var has_local_palette = false;
         if (local_palette_flag) {
           var has_local_palette = true;
           palette_offset = p;  // Override with local palette.
+          palette_size = num_local_colors;
           p += num_local_colors * 3;  // Seek past palette.
         }
 
@@ -471,6 +475,7 @@ function GifReader(buf) {
         frames.push({x: x, y: y, width: w, height: h,
                      has_local_palette: has_local_palette,
                      palette_offset: palette_offset,
+                     palette_size: palette_size,
                      data_offset: data_offset,
                      data_length: p - data_offset,
                      transparent_index: transparent_index,
