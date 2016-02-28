@@ -27,7 +27,7 @@ plask.simpleWindow({
     var frame_num = this.framenum % gr.numFrames();
     var frame_info = gr.frameInfo(frame_num);
 
-    if (frame_num === 0)
+    if (frame_num === 0 || frame_info.disposal === 2 /* restore to bg */)
       pixels.clear(0, 0, 0, 255);
 
     var start = Date.now();
