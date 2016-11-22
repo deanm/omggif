@@ -489,6 +489,10 @@ function GifReader(buf) {
     }
   }
 
+  this.loopCount = function(){
+    return loop_count;
+  };
+
   this.numFrames = function() {
     return frames.length;
   };
