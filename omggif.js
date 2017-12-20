@@ -207,10 +207,6 @@ function GifWriter(buf, width, height, gopts) {
       buf[p++] = 0x3b;  // Trailer.
       ended = true;
     }
-    if (p > buf.length) {
-      throw new Error("Buffer is "+ (p - buf.length) +
-            " bytes too small for encoding");
-    }
     return p;
   };
 }
@@ -474,7 +470,7 @@ function GifReader(buf) {
         while (p < buf.length && (block_size = buf[p++]) !== 0)
           p += block_size;
         if (block_size !== 0)
-          throw new Error("Malformed or prematurely truncated");
+          throw new Error("Malformed or truncated");
 
         frames.push({x: x, y: y, width: w, height: h,
                      has_local_palette: has_local_palette,
