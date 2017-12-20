@@ -424,7 +424,9 @@ function GifReader(buf) {
               p += 12;
               while (true) {  // Seek through subblocks.
                 var block_size = buf[p++];
-                if (block_size === 0) break;
+                // Bad block size (ex: undefined from an out of bounds read).
+                if (!(block_size >= 0)) throw Error("Invalid block size");
+                if (block_size === 0) break;  // 0 size is terminator
                 p += block_size;
               }
             }
@@ -444,7 +446,9 @@ function GifReader(buf) {
           case 0xfe:  // Comment Extension.
             while (true) {  // Seek through subblocks.
               var block_size = buf[p++];
-              if (block_size === 0) break;
+              // Bad block size (ex: undefined from an out of bounds read).
+              if (!(block_size >= 0)) throw Error("Invalid block size");
+              if (block_size === 0) break;  // 0 size is terminator
               // console.log(buf.slice(p, p+block_size).toString('ascii'));
               p += block_size;
             }
@@ -481,7 +485,9 @@ function GifReader(buf) {
         p++;  // codesize
         while (true) {
           var block_size = buf[p++];
-          if (block_size === 0) break;
+          // Bad block size (ex: undefined from an out of bounds read).
+          if (!(block_size >= 0)) throw Error("Invalid block size");
+          if (block_size === 0) break;  // 0 size is terminator
           p += block_size;
         }
 
