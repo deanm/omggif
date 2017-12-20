@@ -24,6 +24,8 @@
 // including animation and compression.  It does not rely on any specific
 // underlying system, so should run in the browser, Node, or Plask.
 
+"use strict";
+
 function GifWriter(buf, width, height, gopts) {
   var p = 0;
 
