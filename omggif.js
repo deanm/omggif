@@ -199,6 +199,8 @@ function GifWriter(buf, width, height, gopts) {
 
     p = GifWriterOutputLZWCodeStream(
             buf, p, min_code_size < 2 ? 2 : min_code_size, indexed_pixels);
+
+    return p;
   };
 
   this.end = function() {
