@@ -34,12 +34,14 @@ function GifWriter(buf, width, height, gopts) {
   var global_palette = gopts.palette === undefined ? null : gopts.palette;
 
   if (width <= 0 || height <= 0 || width > 65535 || height > 65535)
-    throw "Width/Height invalid."
+    throw new Error("Width/Height invalid.");
 
   function check_palette_and_num_colors(palette) {
     var num_colors = palette.length;
-    if (num_colors < 2 || num_colors > 256 ||  num_colors & (num_colors-1))
-      throw "Invalid code/color length, must be power of 2 and 2 .. 256.";
+    if (num_colors < 2 || num_colors > 256 ||  num_colors & (num_colors-1)) {
+      throw new Error("Invalid code/color length, must be power of 2 and "+
+            "in the range 2..256.");
+    }
     return num_colors;
   }
 
@@ -57,13 +59,14 @@ function GifWriter(buf, width, height, gopts) {
     --gp_num_colors_pow2;
     if (gopts.background !== undefined) {
       background = gopts.background;
-      if (background >= gp_num_colors) throw "Background index out of range.";
+      if (background >= gp_num_colors)
+        throw new Error("Background index out of range.");
       // The GIF spec states that a background index of 0 should be ignored, so
       // this is probably a mistake and you really want to set it to another
       // slot in the palette.  But actually in the end most browsers, etc end
       // up ignoring this almost completely (including for dispose background).
       if (background === 0)
-        throw "Background index explicitly passed as 0.";
+        throw new Error("Background index explicitly passed as 0.");
     }
   }
 
@@ -89,7 +92,7 @@ function GifWriter(buf, width, height, gopts) {
 
   if (loop_count !== null) {  // Netscape block for looping.
     if (loop_count < 0 || loop_count > 65535)
-      throw "Loop count invalid."
+      throw new Error("Loop count invalid.");
     // Extension code, label, and length.
     buf[p++] = 0x21; buf[p++] = 0xff; buf[p++] = 0x0b;
     // NETSCAPE2.0
@@ -113,13 +116,13 @@ function GifWriter(buf, width, height, gopts) {
     // TODO(deanm): Bounds check x, y.  Do they need to be within the virtual
     // canvas width/height, I imagine?
     if (x < 0 || y < 0 || x > 65535 || y > 65535)
-      throw "x/y invalid."
+      throw new Error("x/y invalid.");
 
     if (w <= 0 || h <= 0 || w > 65535 || h > 65535)
-      throw "Width/Height invalid."
+      throw new Error("Width/Height invalid.");
 
     if (indexed_pixels.length < w * h)
-      throw "Not enough pixels for the frame size.";
+      throw new Error("Not enough pixels for the frame size.");
 
     var using_local_palette = true;
     var palette = opts.palette;
@@ -129,7 +132,7 @@ function GifWriter(buf, width, height, gopts) {
     }
 
     if (palette === undefined || palette === null)
-      throw "Must supply either a local or global palette.";
+      throw new Error("Must supply either a local or global palette.");
 
     var num_colors = check_palette_and_num_colors(palette);
 
@@ -155,7 +158,7 @@ function GifWriter(buf, width, height, gopts) {
     // browsers ignore the background palette index and clear to transparency.
     var disposal = opts.disposal === undefined ? 0 : opts.disposal;
     if (disposal < 0 || disposal > 3)  // 4-7 is reserved.
-      throw "Disposal out of range.";
+      throw new Error("Disposal out of range.");
 
     var use_transparency = false;
     var transparent_index = 0;
@@ -163,7 +166,7 @@ function GifWriter(buf, width, height, gopts) {
       use_transparency = true;
       transparent_index = opts.transparent;
       if (transparent_index < 0 || transparent_index >= num_colors)
-        throw "Transparent color index.";
+        throw new Error("Invalid transparent color index.");
     }
 
     if (disposal !== 0 || use_transparency || delay !== 0) {
@@ -207,6 +210,10 @@ function GifWriter(buf, width, height, gopts) {
     if (ended === false) {
       buf[p++] = 0x3b;  // Trailer.
       ended = true;
+    }
+    if (p > buf.length) {
+      throw new Error("Buffer is "+ (p - buf.length) +
+            " bytes too small for encoding");
     }
     return p;
   };
@@ -366,7 +373,7 @@ function GifReader(buf) {
   // - Header (GIF87a or GIF89a).
   if (buf[p++] !== 0x47 ||            buf[p++] !== 0x49 || buf[p++] !== 0x46 ||
       buf[p++] !== 0x38 || (buf[p++]+1 & 0xfd) !== 0x38 || buf[p++] !== 0x61) {
-    throw "Invalid GIF 87a/89a header.";
+    throw new Error("Invalid GIF 87a/89a header.");
   }
 
   // - Logical Screen Descriptor.
@@ -429,7 +436,7 @@ function GifReader(buf) {
 
           case 0xf9:  // Graphics Control Extension
             if (buf[p++] !== 0x4 || buf[p+4] !== 0)
-              throw "Invalid graphics extension block.";
+              throw new Error("Invalid graphics extension block.");
             var pf1 = buf[p++];
             delay = buf[p++] | buf[p++] << 8;
             transparent_index = buf[p++];
@@ -448,7 +455,8 @@ function GifReader(buf) {
             break;
 
           default:
-            throw "Unknown graphic control label: 0x" + buf[p-1].toString(16);
+            throw new Error("Unknown graphic control label: 0x" +
+                    buf[p-1].toString(16));
         }
         break;
 
@@ -474,12 +482,12 @@ function GifReader(buf) {
 
         var data_offset = p;
 
+        var block_size = -1;
         p++;  // codesize
-        while (true) {
-          var block_size = buf[p++];
-          if (block_size === 0) break;
+        while (p < buf.length && (block_size = buf[p++]) !== 0)
           p += block_size;
-        }
+        if (block_size !== 0)
+          throw new Error("Malformed or prematurely truncated");
 
         frames.push({x: x, y: y, width: w, height: h,
                      has_local_palette: has_local_palette,
@@ -498,7 +506,7 @@ function GifReader(buf) {
         break;
 
       default:
-        throw "Unknown gif block: 0x" + buf[p-1].toString(16);
+        throw new Error("Unknown gif block: 0x" + buf[p-1].toString(16));
         break;
     }
   }
@@ -513,7 +521,7 @@ function GifReader(buf) {
 
   this.frameInfo = function(frame_num) {
     if (frame_num < 0 || frame_num >= frames.length)
-      throw "Frame index out of range.";
+      throw new Error("Frame index out of range.");
     return frames[frame_num];
   }
 
