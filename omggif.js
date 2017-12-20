@@ -208,6 +208,11 @@ function GifWriter(buf, width, height, gopts) {
     }
     return p;
   };
+
+  this.getOutputBuffer = function() { return buf; };
+  this.setOutputBuffer = function(v) { buf = v; };
+  this.getOutputBufferPosition = function() { return p; };
+  this.setOutputBufferPosition = function(v) { p = v; };
 }
 
 // Main compression routine, palette indexes -> LZW code stream.
