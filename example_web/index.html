@@ -1,0 +1,94 @@
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>omggif</title>
+  </head>
+
+  <body>
+    <h1>omggif</h1>
+
+    <input type="file" id="file" accept="image/gif">
+
+    <div>
+      <canvas id="player"></canvas>
+    </div>
+
+    <script type="text/javascript" src="../omggif.js"></script>
+    <script type="text/javascript">
+      var reader, context, frameNumber, previousFrameInfo, loops, timeout;
+
+      function parseGif(array) {
+        reader = new GifReader(array);
+
+        frameNumber = 0;
+        loops = reader.loopCount();
+        previousFrameInfo = null;
+
+        clearTimeout(timeout);
+        var canvas = document.querySelector('#player');
+        canvas.width = reader.width;
+        canvas.height = reader.height;
+        context = canvas.getContext('2d');
+
+        draw();
+      }
+
+      function draw() {
+        if (!reader) { return; }
+
+        var frameInfo = reader.frameInfo(frameNumber);
+
+        if (frameNumber === 0) {
+          // always clear canvas on first frame
+          context.clearRect(0, 0, reader.width, reader.height);
+        } else if (previousFrameInfo && previousFrameInfo.disposal === 2) {
+          // disposal was "restore to background" which is essentially
+          // "restore to transparent"
+          context.clearRect(previousFrameInfo.x,
+                            previousFrameInfo.y,
+                            previousFrameInfo.width,
+                            previousFrameInfo.height);
+        }
+
+        // draw frame on top of existing canvas data
+        const imageData = context.getImageData(0, 0,
+                                               reader.width, reader.height);
+        reader.decodeAndBlitFrameRGBA(frameNumber, imageData.data);
+        context.putImageData(imageData, 0, 0);
+
+        // get ready to draw next frame
+        previousFrameInfo = frameInfo;
+        frameNumber = (frameNumber + 1) % reader.numFrames();
+
+        if (frameNumber === reader.numFrames() - 1) {
+          if (--loops === 0) {
+            // bail if we're on the last loop
+            return;
+          }
+        }
+
+        timeout = setTimeout(draw, frameInfo.delay * 10);
+      }
+
+      function parseInput(input) {
+        var file = input.files[0];
+        if (file) {
+          var reader = new FileReader();
+          reader.onload = function(e) {
+            var arrayBuffer = e.target.result;
+            var array = new Uint8Array(arrayBuffer);
+            parseGif(array);
+          };
+          reader.readAsArrayBuffer(file);
+        }
+      }
+
+      const element = document.querySelector('#file');
+      element.addEventListener('change', function (e) {
+        parseInput(element);
+      });
+
+      parseInput(element);
+    </script>
+  </body>
+</html>
