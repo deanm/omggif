@@ -92,7 +92,7 @@ function GifWriter(buf, width, height, gopts) {
 
   if (loop_count !== null) {  // Netscape block for looping.
     if (loop_count < 0 || loop_count > 65535)
-      throw new Error("Loop count invalid.")
+      throw new Error("Loop count invalid.");
     // Extension code, label, and length.
     buf[p++] = 0x21; buf[p++] = 0xff; buf[p++] = 0x0b;
     // NETSCAPE2.0
@@ -116,10 +116,10 @@ function GifWriter(buf, width, height, gopts) {
     // TODO(deanm): Bounds check x, y.  Do they need to be within the virtual
     // canvas width/height, I imagine?
     if (x < 0 || y < 0 || x > 65535 || y > 65535)
-      throw new Error("x/y invalid.")
+      throw new Error("x/y invalid.");
 
     if (w <= 0 || h <= 0 || w > 65535 || h > 65535)
-      throw new Error("Width/Height invalid.")
+      throw new Error("Width/Height invalid.");
 
     if (indexed_pixels.length < w * h)
       throw new Error("Not enough pixels for the frame size.");
@@ -525,7 +525,7 @@ function GifReader(buf) {
     if (frame_num < 0 || frame_num >= frames.length)
       throw new Error("Frame index out of range.");
     return frames[frame_num];
-  }
+  };
 
   this.decodeAndBlitFrameBGRA = function(frame_num, pixels) {
     var frame = this.frameInfo(frame_num);
