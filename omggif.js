@@ -550,7 +550,7 @@ function GifReader(buf) {
 
     // Output indicies of the top left and bottom right corners of the subrect.
     var opbeg = ((frame.y * width) + frame.x) * 4;
-    var opend = ((frame.y + frame.height) * width + frame.x) * 4;
+    var opend = ((frame.y + frame.height) * width - (width - frame.width - frame.x)) * 4;
     var op    = opbeg;
 
     var scanstride = framestride * 4;
@@ -616,7 +616,7 @@ function GifReader(buf) {
 
     // Output indicies of the top left and bottom right corners of the subrect.
     var opbeg = ((frame.y * width) + frame.x) * 4;
-    var opend = ((frame.y + frame.height) * width + frame.x) * 4;
+    var opend = ((frame.y + frame.height) * width - (width - frame.width - frame.x)) * 4;
     var op    = opbeg;
 
     var scanstride = framestride * 4;
