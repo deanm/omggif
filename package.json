@@ -2,6 +2,7 @@
   "name": "omggif",
   "version": "1.0.9",
   "author": "Dean McNamee <dean@gmail.com>",
+  "license": "MIT",
   "keywords": ["gif", "gif89a", "gif87a", "plask"],
   "repository": {
     "type": "git",
