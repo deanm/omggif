@@ -15,7 +15,7 @@
 
     <script type="text/javascript" src="../omggif.js"></script>
     <script type="text/javascript">
-      var reader, context, frameNumber, previousFrameInfo, loops, timeout;
+      var reader, context, frameNumber, previousFrameInfo, previousImageData, loops, timeout;
 
       function parseGif(array) {
         reader = new GifReader(array);
@@ -36,38 +36,66 @@
       function draw() {
         if (!reader) { return; }
 
-        var frameInfo = reader.frameInfo(frameNumber);
+        if (frameNumber === reader.numFrames()) {
+          frameNumber = 0;
 
-        if (frameNumber === 0) {
-          // always clear canvas on first frame
-          context.clearRect(0, 0, reader.width, reader.height);
-        } else if (previousFrameInfo && previousFrameInfo.disposal === 2) {
-          // disposal was "restore to background" which is essentially
-          // "restore to transparent"
-          context.clearRect(previousFrameInfo.x,
-                            previousFrameInfo.y,
-                            previousFrameInfo.width,
-                            previousFrameInfo.height);
-        }
-
-        // draw frame on top of existing canvas data
-        const imageData = context.getImageData(0, 0,
-                                               reader.width, reader.height);
-        reader.decodeAndBlitFrameRGBA(frameNumber, imageData.data);
-        context.putImageData(imageData, 0, 0);
-
-        // get ready to draw next frame
-        previousFrameInfo = frameInfo;
-        frameNumber = (frameNumber + 1) % reader.numFrames();
-
-        if (frameNumber === reader.numFrames() - 1) {
           if (--loops === 0) {
             // bail if we're on the last loop
             return;
           }
         }
 
+        var frameInfo = reader.frameInfo(frameNumber);
         timeout = setTimeout(draw, frameInfo.delay * 10);
+
+        if (frameNumber === 0) {
+          // Always clear whole canvas on the first frame
+          context.clearRect(0, 0, reader.width, reader.height);
+        }
+
+        if (previousFrameInfo) {
+          switch (previousFrameInfo.disposal) {
+            case 0:
+              // "No disposal specified" - do nothing, we draw over the existing canvas
+              break;
+            case 1:
+              // "Do not dispose" - do nothing, we draw over the existing canvas
+              break;
+            case 2:
+              // "Restore to background" - browsers ignore background color, so
+              // in practice it is always "Restore to transparent"
+              context.clearRect(previousFrameInfo.x,
+                                previousFrameInfo.y,
+                                previousFrameInfo.width,
+                                previousFrameInfo.height);
+              break;
+            case 3:
+              // "Restore to previous" - revert back to most recent frame that was
+              // not set to "Restore to previous", or frame 0
+              if (previousImageData) {
+                context.putImageData(previousImageData, 0, 0);
+              }
+              break;
+            default:
+              console.error("Disposal method is unsupported");
+          }
+        }
+
+        if (frameNumber === 0 || frameInfo.disposal < 2) {
+          // save this frame in case we need to revert to it later
+          previousImageData = context.getImageData(0, 0, reader.width, reader.height);
+          previousImageData.frame = frameNumber;
+        }
+
+        // draw frame on top of existing canvas data
+        var imageData = context.getImageData(0, 0, reader.width, reader.height);
+
+        reader.decodeAndBlitFrameRGBA(frameNumber, imageData.data);
+        context.putImageData(imageData, 0, 0, frameInfo.x, frameInfo.y, frameInfo.width, frameInfo.height);
+
+        // get ready to draw next frame
+        previousFrameInfo = frameInfo;
+        frameNumber++;
       }
 
       function parseInput(input) {
@@ -83,7 +111,7 @@
         }
       }
 
-      const element = document.querySelector('#file');
+      var element = document.querySelector('#file');
       element.addEventListener('change', function (e) {
         parseInput(element);
       });
