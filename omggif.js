@@ -548,9 +548,11 @@ function GifReader(buf) {
     var framestride = width - framewidth;
     var xleft       = framewidth;  // Number of subrect pixels left in scanline.
 
-    // Output indicies of the top left and bottom right corners of the subrect.
+    // Output index of the top left corner of the subrect.
     var opbeg = ((frame.y * width) + frame.x) * 4;
-    var opend = ((frame.y + frame.height) * width - (width - frame.width - frame.x)) * 4;
+    // Output index of what would be the left edge of the subrect, one row below it,
+    // i.e. the index at which an interlace pass should wrap.
+    var opend = ((frame.y + frame.height) * width + frame.x) * 4;
     var op    = opbeg;
 
     var scanstride = framestride * 4;
@@ -614,9 +616,11 @@ function GifReader(buf) {
     var framestride = width - framewidth;
     var xleft       = framewidth;  // Number of subrect pixels left in scanline.
 
-    // Output indicies of the top left and bottom right corners of the subrect.
+    // Output index of the top left corner of the subrect.
     var opbeg = ((frame.y * width) + frame.x) * 4;
-    var opend = ((frame.y + frame.height) * width - (width - frame.width - frame.x)) * 4;
+    // Output index of what would be the left edge of the subrect, one row below it,
+    // i.e. the index at which an interlace pass should wrap.
+    var opend = ((frame.y + frame.height) * width + frame.x) * 4;
     var op    = opbeg;
 
     var scanstride = framestride * 4;
