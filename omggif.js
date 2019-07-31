@@ -443,6 +443,10 @@ function GifReader(buf) {
             p++;  // Skip terminator.
             break;
 
+          // Plain Text Extension could be present and we just want to be able
+          // to parse past it.  It follows the block structure of the comment
+          // extension enough to reuse the path to skip through the blocks.
+          case 0x01:  // Plain Text Extension (fallthrough to Comment Extension)
           case 0xfe:  // Comment Extension.
             while (true) {  // Seek through subblocks.
               var block_size = buf[p++];
