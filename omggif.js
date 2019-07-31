@@ -554,8 +554,8 @@ function GifReader(buf) {
 
     // Output index of the top left corner of the subrect.
     var opbeg = ((frame.y * width) + frame.x) * 4;
-    // Output index of what would be the left edge of the subrect, one row below it,
-    // i.e. the index at which an interlace pass should wrap.
+    // Output index of what would be the left edge of the subrect, one row
+    // below it, i.e. the index at which an interlace pass should wrap.
     var opend = ((frame.y + frame.height) * width + frame.x) * 4;
     var op    = opbeg;
 
@@ -622,8 +622,8 @@ function GifReader(buf) {
 
     // Output index of the top left corner of the subrect.
     var opbeg = ((frame.y * width) + frame.x) * 4;
-    // Output index of what would be the left edge of the subrect, one row below it,
-    // i.e. the index at which an interlace pass should wrap.
+    // Output index of what would be the left edge of the subrect, one row
+    // below it, i.e. the index at which an interlace pass should wrap.
     var opend = ((frame.y + frame.height) * width + frame.x) * 4;
     var op    = opbeg;
 
