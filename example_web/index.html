@@ -1,0 +1,122 @@
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>omggif viewer example</title>
+  </head>
+
+  <body>
+    <h1>omggif viewer example</h1>
+
+    <input type="file" id="file" accept="image/gif">
+
+    <div>
+      <canvas id="player"></canvas>
+    </div>
+
+    <script type="text/javascript" src="../omggif.js"></script>
+    <script type="text/javascript">
+      var reader, context, frameNumber, previousFrameInfo, previousImageData, loops, timeout;
+
+      function parseGif(array) {
+        reader = new GifReader(array);
+
+        frameNumber = 0;
+        loops = reader.loopCount();
+        previousFrameInfo = null;
+
+        clearTimeout(timeout);
+        var canvas = document.querySelector('#player');
+        canvas.width = reader.width;
+        canvas.height = reader.height;
+        context = canvas.getContext('2d');
+
+        draw();
+      }
+
+      function draw() {
+        if (!reader) { return; }
+
+        if (frameNumber === reader.numFrames()) {
+          frameNumber = 0;
+
+          if (--loops === 0) {
+            // bail if we're on the last loop
+            return;
+          }
+        }
+
+        var frameInfo = reader.frameInfo(frameNumber);
+        timeout = setTimeout(draw, frameInfo.delay * 10);
+
+        if (frameNumber === 0) {
+          // Always clear whole canvas on the first frame
+          context.clearRect(0, 0, reader.width, reader.height);
+        }
+
+        if (previousFrameInfo) {
+          switch (previousFrameInfo.disposal) {
+            case 0:
+              // "No disposal specified" - do nothing, we draw over the existing canvas
+              break;
+            case 1:
+              // "Do not dispose" - do nothing, we draw over the existing canvas
+              break;
+            case 2:
+              // "Restore to background" - browsers ignore background color, so
+              // in practice it is always "Restore to transparent"
+              context.clearRect(previousFrameInfo.x,
+                                previousFrameInfo.y,
+                                previousFrameInfo.width,
+                                previousFrameInfo.height);
+              break;
+            case 3:
+              // "Restore to previous" - revert back to most recent frame that was
+              // not set to "Restore to previous", or frame 0
+              if (previousImageData) {
+                context.putImageData(previousImageData, 0, 0);
+              }
+              break;
+            default:
+              console.error("Disposal method is unsupported");
+          }
+        }
+
+        if (frameNumber === 0 || frameInfo.disposal < 2) {
+          // save this frame in case we need to revert to it later
+          previousImageData = context.getImageData(0, 0, reader.width, reader.height);
+          previousImageData.frame = frameNumber;
+        }
+
+        // draw frame on top of existing canvas data
+        var imageData = context.getImageData(0, 0, reader.width, reader.height);
+
+        reader.decodeAndBlitFrameRGBA(frameNumber, imageData.data);
+        context.putImageData(imageData, 0, 0, frameInfo.x, frameInfo.y, frameInfo.width, frameInfo.height);
+
+        // get ready to draw next frame
+        previousFrameInfo = frameInfo;
+        frameNumber++;
+      }
+
+      function parseInput(input) {
+        var file = input.files[0];
+        if (file) {
+          var reader = new FileReader();
+          reader.onload = function(e) {
+            var arrayBuffer = e.target.result;
+            var array = new Uint8Array(arrayBuffer);
+            parseGif(array);
+          };
+          reader.readAsArrayBuffer(file);
+        }
+      }
+
+      var element = document.querySelector('#file');
+      element.addEventListener('change', function (e) {
+        parseInput(element);
+      });
+
+      parseInput(element);
+    </script>
+  </body>
+</html>
