@@ -392,6 +392,7 @@ function GifReader(buf) {
   }
 
   var no_eof = true;
+  var saw_trailer = false;  // PATCH: 记录是否真的读到了 0x3B 结尾标记
 
   var frames = [ ];
 
@@ -509,6 +510,7 @@ function GifReader(buf) {
 
       case 0x3b:  // Trailer Marker (end of file).
         no_eof = false;
+        saw_trailer = true;  // PATCH
         break;
 
       default:
@@ -516,6 +518,12 @@ function GifReader(buf) {
         break;
     }
   }
+
+  // PATCH: 截断的文件不该被当成"合法但没帧"。缺 trailer 或一帧都没有，就抛。
+  if (!saw_trailer)
+    throw new Error("Truncated GIF: missing trailer at byte " + p);
+  if (frames.length === 0)
+    throw new Error("Truncated or empty GIF: no complete frame");
 
   this.numFrames = function() {
     return frames.length;
